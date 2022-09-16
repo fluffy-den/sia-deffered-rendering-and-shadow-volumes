@@ -37,7 +37,7 @@ private:
   int _winWidth, _winHeight;
 
   Camera _cam;
-  Shader _blinnPrg, _simplePrg, _ambiantPrg;
+  Shader _blinnPrg, _simplePrg;
 
   // some geometry to render
   std::vector<Mesh *> _shapes;

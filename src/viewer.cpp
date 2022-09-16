@@ -179,8 +179,6 @@ void Viewer::loadProgram() {
                           DATA_DIR "/shaders/blinn.frag");
   _simplePrg.loadFromFiles(DATA_DIR "/shaders/simple.vert",
                            DATA_DIR "/shaders/simple.frag");
-  _ambiantPrg.loadFromFiles(DATA_DIR "/shaders/ambiant.vert",
-                            DATA_DIR "/shaders/ambiant.frag");
 }
 
 void Viewer::updateGUI() {
