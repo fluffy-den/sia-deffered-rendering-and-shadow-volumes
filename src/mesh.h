@@ -3,7 +3,7 @@
 #include "common.h"
 #include "opengl.h"
 
-#include <pmp/SurfaceMesh.h>
+#include <pmp/surface_mesh.h>
 #include <Eigen/Core>
 #include <string>
 #include <vector>

@@ -2,9 +2,9 @@ file(GLOB SOURCES ./*.cpp)
 file(GLOB HEADERS ./*.h)
 
 if(EMSCRIPTEN)
-  add_library(pmp STATIC ${SOURCES} ${HEADERS} $<TARGET_OBJECTS:rply>)
+  add_library(pmp STATIC ${SOURCES} ${HEADERS})
 else()
-  add_library(pmp STATIC ${SOURCES} ${HEADERS} $<TARGET_OBJECTS:rply>)
+  add_library(pmp ${SOURCES} ${HEADERS})
   set_property(TARGET pmp PROPERTY WINDOWS_EXPORT_ALL_SYMBOLS ON)
 endif()
 
@@ -22,12 +22,12 @@ endif()
 if(NOT EMSCRIPTEN AND PMP_INSTALL)
 
   target_include_directories(
-    pmp PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../>
-               $<INSTALL_INTERFACE:include/>)
+    pmp
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../>
+           $<BUILD_INTERFACE:${EIGEN3_INCLUDE_DIR}>
+           $<INSTALL_INTERFACE:include/>)
 
-  if(UNIX OR APPLE)
-    target_compile_options(pmp PUBLIC "-std=c++14")
-  endif()
+  target_compile_features(pmp PUBLIC cxx_std_17)
 
   install(
     TARGETS pmp
@@ -39,7 +39,8 @@ if(NOT EMSCRIPTEN AND PMP_INSTALL)
     DESTINATION include)
 
   install(FILES ${HEADERS} DESTINATION include/pmp/)
-
+else()
+  target_include_directories(pmp PUBLIC ${EIGEN3_INCLUDE_DIR})
 endif()
 
 if(PMP_BUILD_VIS)
@@ -47,3 +48,4 @@ if(PMP_BUILD_VIS)
 endif()
 
 include(algorithms/CMakeLists.txt)
+include(io/CMakeLists.txt)

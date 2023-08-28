@@ -9,7 +9,7 @@ FBO::~FBO()
 
 void FBO::clear()
 {
-    glDeleteTextures(3, textures);
+    glDeleteTextures(3, _buffers);
     glDeleteFramebuffers(1, &_fboId);
 }
 
@@ -21,7 +21,7 @@ void FBO::init(int width, int height)
 
     //1. Create a framebuffer object, and then bind it
 
-    //2. Generate two texture ids in "textures[]"
+    //2. Generate two texture ids in "_buffers"
 
     for(int i=0; i<2; ++i){
         //3. Bind the newly created texture
@@ -61,8 +61,7 @@ void FBO::unbind()
 
 void FBO::savePNG(const std::string &name, int i)
 {
-    assert(i<2);
-    glBindTexture(GL_TEXTURE_2D, textures[i]);
+    glBindTexture(GL_TEXTURE_2D, textureId(i));
     GLubyte *data = new GLubyte [4 * _width * _height];
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
     unsigned char* raw_data = reinterpret_cast<unsigned char*>(data);

@@ -6,7 +6,8 @@
 #include <iostream>
 #include <sstream>
 
-#include <pmp/algorithms/SurfaceNormals.h>
+#include <pmp/io/io.h>
+#include <pmp/algorithms/normals.h>
 
 using namespace std;
 using namespace Eigen;
@@ -22,9 +23,9 @@ Mesh::~Mesh() {
 void Mesh::load(const string &filename) {
   cout << "Loading: " << filename << endl;
 
-  read(filename);
-  SurfaceNormals::compute_face_normals(*this);
-  SurfaceNormals::compute_vertex_normals(*this);
+  pmp::read(*this, filename);
+  pmp::face_normals(*this);
+  pmp::vertex_normals(*this);
 
   // vertex properties
   auto vpoints = get_vertex_property<Point>("v:point");
@@ -187,7 +188,7 @@ void Mesh::createSphere(float radius, int nU, int nV) {
       _indices.push_back(v3.idx());
     }
   }
-  SurfaceNormals::compute_face_normals(*this);
+  pmp::face_normals(*this);
 }
 
 void Mesh::init() {
@@ -204,8 +205,8 @@ void Mesh::updateAll() {
 }
 
 void Mesh::updateNormals() {
-  SurfaceNormals::compute_face_normals(*this);
-  SurfaceNormals::compute_vertex_normals(*this);
+  pmp::face_normals(*this);
+  pmp::vertex_normals(*this);
 }
 
 void Mesh::updateVBO() {

@@ -1,13 +1,13 @@
 # Introduction
 
 [![build](https://github.com/pmp-library/pmp-library/workflows/build/badge.svg)](https://github.com/pmp-library/pmp-library/actions?query=workflow%3Abuild)
-[![Coverage Status](https://coveralls.io/repos/github/pmp-library/pmp-library/badge.svg?branch=master)](https://coveralls.io/github/pmp-library/pmp-library?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/pmp-library/pmp-library/badge.svg?branch=master)](https://coveralls.io/github/pmp-library/pmp-library?branch=main)
 [![Latest Release](https://img.shields.io/github/v/release/pmp-library/pmp-library?sort=semver)](https://github.com/pmp-library/pmp-library/releases/latest)
 
 The Polygon Mesh Processing Library is a modern C++ open-source library for processing and visualizing polygon surface meshes. Its main features are:
 
 - An efficient and easy-to-use mesh data structure
-- Standard algorithms such as simplification, remeshing, subdivision, or smoothing
+- Standard algorithms such as decimation, remeshing, subdivision, or smoothing
 - Ready-to-use visualization tools
 - Seamless cross-compilation to JavaScript ([demo](https://www.pmp-library.org/mpview.html))
 
@@ -16,7 +16,7 @@ The Polygon Mesh Processing Library is a modern C++ open-source library for proc
 Clone the repository:
 
 ```sh
-git clone --recursive https://github.com/pmp-library/pmp-library.git
+git clone https://github.com/pmp-library/pmp-library.git
 ```
 
 Configure and build:
@@ -28,26 +28,30 @@ cd pmp-library && mkdir build && cd build && cmake .. && make
 Run the mesh processing app:
 
 ```sh
-./mpview ../external/pmp-data/off/bunny.off
+./mpview ../data/off/bunny.off
 ```
 
 Build your own tool:
 
 ```cpp
-#include <pmp/SurfaceMesh.h>
+#include <pmp/surface_mesh.h>
 
 int main(void)
 {
     pmp::SurfaceMesh mesh;
-    mesh.read("input.obj");
+    pmp::read(mesh,"input.obj");
     // .. do awesome things with your mesh
-    mesh.write("output.obj");
+    pmp::write(mesh,"output.obj");
 }
 ```
 
+## Read the Docs
+
+The [user guide](https://www.pmp-library.org/guide.html) contains all you need to get started using PMP, including a [tutorial](https://www.pmp-library.org/tutorial.html) covering mesh processing basics.
+
 ## Contribute
 
-Contributions to PMP are welcome. See the [contributing](https://www.pmp-library.org/contributing.html) section of the [user guide](https://www.pmp-library.org/userguide.html).
+Contributions to PMP are welcome! There are many ways you can help: Report any [issues](https://github.com/pmp-library/pmp-library/issues) you find, help to improve the documentation, join our [discussions](https://github.com/pmp-library/pmp-library/discussions) forum, or [contribute](https://www.pmp-library.org/contributing.html) new code.
 
 ## Acknowledge
 

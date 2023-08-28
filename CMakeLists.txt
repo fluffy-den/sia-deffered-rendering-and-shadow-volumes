@@ -2,7 +2,7 @@ cmake_policy(SET CMP0048 NEW)
 
 project(sia_glrenderer)
 
-cmake_minimum_required(VERSION 3.2.0)
+cmake_minimum_required(VERSION 3.5.0)
 
 add_subdirectory(ext ext_build)
 
@@ -45,4 +45,4 @@ endfunction()
 file(GLOB SHADERS "data/shaders/*.vert" "data/shaders/*.frag")
 IndicateExternalFile("sia_glrenderer" ${SHADERS})
 
-target_compile_features(sia_glrenderer PRIVATE cxx_std_14)
+target_compile_features(sia_glrenderer PRIVATE cxx_std_17)

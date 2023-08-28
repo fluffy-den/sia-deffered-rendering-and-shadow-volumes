@@ -1,28 +1,5 @@
-/* variable overrides */
-html {
-  --side-nav-arrow-opacity: 1;
-  --side-nav-arrow-hover-opacity: 1;
-}
-
 #projectname {
   white-space: revert;
-}
-
-/* github corner icon styles */
-.github-corner {
-  position: absolute;
-  top: 0;
-  right: 0;
-}
-
-.github-corner img {
-  width: 55px;
-  height: 55px;
-}
-
-/* nav-tree arrows */
-#nav-tree .arrow {
-  margin-left: 10px;
 }
 
 .arrow {
@@ -40,6 +17,12 @@ html {
 /* page title larger than section heading */
 div.header .title {
   font-size: 2.25em;
+}
+
+/* figure caption font and margin */
+div.caption {
+  font-weight: normal;
+  margin-top: 0.5em;
 }
 
 /* centered copyright footer */
@@ -61,4 +44,12 @@ dl.citelist dt {
   line-height: var(--content-line-height);
   color: var(--page-foreground-color);
   padding-top: 0.4em;
+}
+
+.demo {
+  display: block;
+  width: 75%;
+  height: 60vh;
+  border: 1px solid #dedede;
+  border-radius: 3px;
 }

@@ -1,18 +1,19 @@
+cmake_minimum_required(VERSION 3.16.3)
 cmake_policy(SET CMP0048 NEW)
 project(
   pmp-library
   VERSION 2.0.1
   DESCRIPTION "The Polygon Mesh Processing Library"
   HOMEPAGE_URL "https://www.pmp-library.org")
-cmake_minimum_required(VERSION 3.16.3)
 cmake_policy(SET CMP0072 NEW)
 
-option(PMP_BUILD_APPS "Build the PMP applications" ON)
 option(PMP_BUILD_EXAMPLES "Build the PMP examples" ON)
 option(PMP_BUILD_TESTS "Build the PMP test programs" ON)
 option(PMP_BUILD_DOCS "Build the PMP documentation" ON)
 option(PMP_BUILD_VIS "Build the PMP visualization tools" ON)
 option(PMP_INSTALL "Install the PMP library and headers" ON)
+option(PMP_STRICT_COMPILATION "Treat compiler warnings as errors" ON)
+option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 
 # set output paths
 set(PROJECT_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
@@ -22,15 +23,14 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 if(PMP_BUILD_VIS)
-  set(GLFW_SOURCE_DIR "external/glfw")
-  set(GLEW_SOURCE_DIR "external/glew")
-  set(IMGUI_SOURCE_DIR "external/imgui")
-  set(STBI_SOURCE_DIR "external/stb_image")
+  set(GLFW_SOURCE_DIR "external/glfw-3.3.8")
+  set(GLEW_SOURCE_DIR "external/glew-2.2.0")
+  set(IMGUI_SOURCE_DIR "external/imgui-1.89.8")
+  set(STB_IMAGE_SOURCE_DIR "external/stb_image-2.28")
+  set(STB_IMAGE_WRITE_SOURCE_DIR "external/stb_image_write-1.16")
 
-  # setup STB Image (place *before* GLFW since GLFW has an old copy of
-  # stb_image_write.h)
-  include_directories(${STBI_SOURCE_DIR})
-  add_subdirectory(${STBI_SOURCE_DIR})
+  add_subdirectory(${STB_IMAGE_WRITE_SOURCE_DIR})
+  add_subdirectory(${STB_IMAGE_SOURCE_DIR})
 
   # Building only the GLFW lib
   set(BUILD_SHARED_LIBS
@@ -53,31 +53,24 @@ if(PMP_BUILD_VIS)
   if(NOT EMSCRIPTEN)
     add_subdirectory(${GLFW_SOURCE_DIR} ${GLEW_SOURCE_DIR})
 
-    include_directories(${GLFW_SOURCE_DIR}/include ${GLFW_SOURCE_DIR}/deps
-                        ${GLEW_SOURCE_DIR}/include)
-
     add_definitions(-DGLEW_STATIC)
     add_library(glew STATIC ${GLEW_SOURCE_DIR}/src/glew.c
                             ${GLEW_SOURCE_DIR}/include)
     set_property(TARGET glew PROPERTY POSITION_INDEPENDENT_CODE ON)
+    target_include_directories(glew PUBLIC ${GLEW_SOURCE_DIR}/include
+                                           ${GLFW_SOURCE_DIR}/include)
     target_link_libraries(glew ${GLFW_LIBRARIES})
   endif()
 
   # setup IMGUI
-  include_directories(${IMGUI_SOURCE_DIR})
   add_subdirectory(${IMGUI_SOURCE_DIR})
 endif(PMP_BUILD_VIS)
 
-# setup Eigen
-set(EIGEN_SOURCE_DIR "../eigen3")
-include_directories(${EIGEN_SOURCE_DIR})
+if(NOT DEFINED EIGEN3_INCLUDE_DIR)
+  set(EIGEN3_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/external/eigen-3.4.0")
+endif()
+find_package(Eigen3 3.4.0 REQUIRED)
 
-# setup PLY
-set(RPLY_SOURCE_DIR "external/rply")
-include_directories(${RPLY_SOURCE_DIR})
-add_subdirectory(${RPLY_SOURCE_DIR})
-
-include(AddFileDependencies)
 include_directories(${PROJECT_SOURCE_DIR}/src/)
 
 # setup for code coverage testing
@@ -106,13 +99,16 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug"
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 endif()
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # set default compiler flags for both gcc and clang
-set(COMMON_CXX_FLAGS "-pedantic -Wall -Wextra -Wshadow -Werror")
+set(COMMON_CXX_FLAGS "-pedantic -Wall -Wextra -Wshadow")
+if(PMP_STRICT_COMPILATION)
+  set(COMMON_CXX_FLAGS "${COMMON_CXX_FLAGS} -Werror")
+endif()
 
 if((UNIX OR APPLE) AND CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS
@@ -122,8 +118,9 @@ if((UNIX OR APPLE) AND CMAKE_COMPILER_IS_GNUCXX)
   endif()
 endif()
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT EMSCRIPTEN)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${COMMON_CXX_FLAGS}")
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT EMSCRIPTEN)
+  set(CMAKE_CXX_FLAGS
+      "${CMAKE_CXX_FLAGS} ${COMMON_CXX_FLAGS} --system-header-prefix=Eigen")
 endif()
 
 if(WIN32)
@@ -140,8 +137,10 @@ endif()
 
 if(EMSCRIPTEN)
   add_compile_options(--no-heap-copy)
+  add_compile_options(-fexceptions)
+  add_link_options(-fexceptions)
   add_link_options(
-    "SHELL:-s WASM=1 -s USE_WEBGL2=1 -s USE_GLFW=3 -s ALLOW_MEMORY_GROWTH=1 -s MINIFY_HTML=0 -s DISABLE_EXCEPTION_CATCHING=0"
+    "SHELL:-sWASM=1 -sUSE_WEBGL2=1 -sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sALLOW_TABLE_GROWTH=1 -sSTACK_SIZE=5MB"
   )
   set(CMAKE_EXECUTABLE_SUFFIX ".html")
 endif()
@@ -180,14 +179,11 @@ include(clang-tidy)
 # which directories to process
 if(EMSCRIPTEN)
   add_subdirectory(src/pmp)
-  if(PMP_BUILD_APPS)
-    add_subdirectory(src/apps)
+  if(PMP_BUILD_EXAMPLES)
+    add_subdirectory(examples)
   endif()
 else()
   add_subdirectory(src/pmp)
-  if(PMP_BUILD_APPS)
-    add_subdirectory(src/apps)
-  endif()
   if(PMP_BUILD_DOCS)
     add_subdirectory(docs)
   endif()
@@ -199,13 +195,6 @@ else()
     add_subdirectory(tests)
   endif()
 endif()
-
-set(CPACK_PACKAGE_VERSION ${PMP_VERSION})
-set(CPACK_SOURCE_PACKAGE_FILE_NAME
-    "${CMAKE_PROJECT_NAME}-${CPACK_PACKAGE_VERSION}")
-set(CPACK_SOURCE_IGNORE_FILES "/build/;/.git/;~$;${CPACK_SOURCE_IGNORE_FILES}")
-set(CPACK_SOURCE_GENERATOR "ZIP")
-include(CPack)
 
 if(NOT EMSCRIPTEN AND PMP_INSTALL)
 
