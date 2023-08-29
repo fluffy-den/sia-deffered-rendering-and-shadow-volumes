@@ -19,30 +19,47 @@ void FBO::init(int width, int height)
     _width = width;
     _height = height;
 
-    //1. Create a framebuffer object, and then bind it
+    //1. create a framebuffer object
+    glGenFramebuffers(1, &_fboId);
+    glBindFramebuffer(GL_FRAMEBUFFER, _fboId);
 
-    //2. Generate two texture ids in "_buffers"
+    //2. init texture
+    glGenTextures(2, _buffers);
 
     for(int i=0; i<2; ++i){
-        //3. Bind the newly created texture
+        // Bind the newly created texture
+        glBindTexture(GL_TEXTURE_2D, _buffers[i]);
 
-        //4. Allocate GPU memory for this empty texture
+        // Give an empty image to OpenGL
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, 0);
 
-        //5. Attach the texture to FBO color attachment point
+        // Specify the filtering and warping parameters
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+        //3. attach the texture to FBO color attachment point
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0+i, GL_TEXTURE_2D, _buffers[i], 0);
     }
 
-    //6. Generate a renderbuffer to store depth, and then bind it
+    //4. init a depth + stencil buffer as a renderbuffer
+    glGenRenderbuffers(1, &_buffers[2]);
+    glBindRenderbuffer(GL_RENDERBUFFER, _buffers[2]);
 
-    //7. Allocate GPU memory
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
 
-    //8. Attach the depth buffer to FBO depth attachment point
+    //5. attach the depth buffer to FBO depth attachment point
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, _buffers[2]);
 
-    //9. Set the list of draw buffers: the color attachment points
+    //6. Set the list of draw buffers.
+    GLenum DrawBuffers[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+    glDrawBuffers(2, DrawBuffers); // "2" is the size of DrawBuffers
 
-    //10. Check FBO status
+    //7. check FBO status
     checkFBOAttachment();
 
-    //11. Switch back to original framebuffer
+    //8. switch back to original framebuffer
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
 
