@@ -11,18 +11,19 @@ namespace glbinding
 
 Function<void, GLfloat, GLboolean> Binding::SampleCoverage("glSampleCoverage");
 Function<void, GLfloat, GLboolean> Binding::SampleCoverageARB("glSampleCoverageARB");
+Function<void, GLclampx, GLboolean> Binding::SampleCoveragexOES("glSampleCoveragexOES");
 Function<void, GLuint, GLuint, GLenum> Binding::SampleMapATI("glSampleMapATI");
 Function<void, GLclampf, GLboolean> Binding::SampleMaskEXT("glSampleMaskEXT");
+Function<void, GLuint, GLbitfield> Binding::SampleMaski("glSampleMaski");
 Function<void, GLuint, GLbitfield> Binding::SampleMaskIndexedNV("glSampleMaskIndexedNV");
 Function<void, GLclampf, GLboolean> Binding::SampleMaskSGIS("glSampleMaskSGIS");
-Function<void, GLuint, GLbitfield> Binding::SampleMaski("glSampleMaski");
 Function<void, GLenum> Binding::SamplePatternEXT("glSamplePatternEXT");
 Function<void, GLenum> Binding::SamplePatternSGIS("glSamplePatternSGIS");
-Function<void, GLuint, GLenum, const GLint *> Binding::SamplerParameterIiv("glSamplerParameterIiv");
-Function<void, GLuint, GLenum, const GLuint *> Binding::SamplerParameterIuiv("glSamplerParameterIuiv");
 Function<void, GLuint, GLenum, GLfloat> Binding::SamplerParameterf("glSamplerParameterf");
 Function<void, GLuint, GLenum, const GLfloat *> Binding::SamplerParameterfv("glSamplerParameterfv");
 Function<void, GLuint, GLenum, GLint> Binding::SamplerParameteri("glSamplerParameteri");
+Function<void, GLuint, GLenum, const GLint *> Binding::SamplerParameterIiv("glSamplerParameterIiv");
+Function<void, GLuint, GLenum, const GLuint *> Binding::SamplerParameterIuiv("glSamplerParameterIuiv");
 Function<void, GLuint, GLenum, const GLint *> Binding::SamplerParameteriv("glSamplerParameteriv");
 Function<void, GLdouble, GLdouble, GLdouble> Binding::Scaled("glScaled");
 Function<void, GLfloat, GLfloat, GLfloat> Binding::Scalef("glScalef");
@@ -75,6 +76,7 @@ Function<void, GLint, GLenum, GLsizei, const void *> Binding::SecondaryColorPoin
 Function<void, GLint, GLenum, GLint, const void **, GLint> Binding::SecondaryColorPointerListIBM("glSecondaryColorPointerListIBM");
 Function<void, GLsizei, GLuint *> Binding::SelectBuffer("glSelectBuffer");
 Function<void, GLuint, GLboolean, GLuint, GLint, GLuint *> Binding::SelectPerfMonitorCountersAMD("glSelectPerfMonitorCountersAMD");
+Function<void, GLuint, GLenum, const GLint *> Binding::SemaphoreParameterivNV("glSemaphoreParameterivNV");
 Function<void, GLuint, GLenum, const GLuint64 *> Binding::SemaphoreParameterui64vEXT("glSemaphoreParameterui64vEXT");
 Function<void, GLenum, GLenum, GLsizei, GLsizei, GLenum, GLenum, const void *, const void *> Binding::SeparableFilter2D("glSeparableFilter2D");
 Function<void, GLenum, GLenum, GLsizei, GLsizei, GLenum, GLenum, const void *, const void *> Binding::SeparableFilter2DEXT("glSeparableFilter2DEXT");
@@ -98,6 +100,7 @@ Function<void, GLenum, GLuint, const GLint *> Binding::ShadingRateSampleOrderCus
 Function<void, GLenum> Binding::ShadingRateSampleOrderNV("glShadingRateSampleOrderNV");
 Function<void, GLenum, GLsizei, const GLfloat *> Binding::SharpenTexFuncSGIS("glSharpenTexFuncSGIS");
 Function<void, GLuint, GLuint, const GLuint *, GLuint, const GLuint *, const GLenum *> Binding::SignalSemaphoreEXT("glSignalSemaphoreEXT");
+Function<void, GLuint, GLsizei, const GLuint *, const GLuint64 *> Binding::SignalSemaphoreui64NVX("glSignalSemaphoreui64NVX");
 Function<void, GLuint64> Binding::SignalVkFenceNV("glSignalVkFenceNV");
 Function<void, GLuint64> Binding::SignalVkSemaphoreNV("glSignalVkSemaphoreNV");
 Function<void, GLuint, const GLchar *, GLuint, const GLuint *, const GLuint *> Binding::SpecializeShader("glSpecializeShader");
@@ -131,7 +134,6 @@ Function<void, GLsizei, const void *> Binding::StringMarkerGREMEDY("glStringMark
 Function<void, GLuint, GLuint> Binding::SubpixelPrecisionBiasNV("glSubpixelPrecisionBiasNV");
 Function<void, GLuint, GLuint, GLenum, GLenum, GLenum, GLenum> Binding::SwizzleEXT("glSwizzleEXT");
 Function<void, GLuint> Binding::SyncTextureINTEL("glSyncTextureINTEL");
-
 
 
 } // namespace glbinding

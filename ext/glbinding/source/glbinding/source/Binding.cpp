@@ -190,7 +190,9 @@ void Binding::initialize(
         provideState(pos);
 
         if(_useContext)
+        {
             useContext(context);
+        }
 
         if (_resolveFunctions)
         {
@@ -200,7 +202,9 @@ void Binding::initialize(
 
     // restore previous context
     if(resolveWOUse)
+    {
         useContext(currentContext);
+    }
 }
 
 ProcAddress Binding::resolveFunction(const char * name)
@@ -314,21 +318,13 @@ void Binding::neglectState(const int p)
     assert(p <= s_maxPos());
     assert(p > -1);
 
-    if (p == s_maxPos())
+    /*
+     * Todo: reintegrate dynamic shrinking of state vectors.
+     * Further details: https://github.com/cginternals/glbinding/issues/198
+     */
+    for (AbstractFunction * function : Binding::functions())
     {
-        for (AbstractFunction * function : Binding::functions())
-        {
-            function->resizeStates(std::max(0, p - 1));
-        }
-
-        --s_maxPos();
-    }
-    else
-    {
-        for (AbstractFunction * function : Binding::functions())
-        {
-            function->state(p) = State();
-        }
+        function->state(p) = State();
     }
 
     if (p == s_pos())

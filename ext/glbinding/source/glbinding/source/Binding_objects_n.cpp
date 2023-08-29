@@ -14,6 +14,7 @@ Function<void, GLuint, GLsizeiptr, const void *, GLenum> Binding::NamedBufferDat
 Function<void, GLuint, GLsizeiptr, const void *, GLenum> Binding::NamedBufferDataEXT("glNamedBufferDataEXT");
 Function<void, GLuint, GLintptr, GLsizeiptr, GLboolean> Binding::NamedBufferPageCommitmentARB("glNamedBufferPageCommitmentARB");
 Function<void, GLuint, GLintptr, GLsizeiptr, GLboolean> Binding::NamedBufferPageCommitmentEXT("glNamedBufferPageCommitmentEXT");
+Function<void, GLuint, GLintptr, GLsizeiptr, GLuint, GLuint64, GLboolean> Binding::NamedBufferPageCommitmentMemNV("glNamedBufferPageCommitmentMemNV");
 Function<void, GLuint, GLsizeiptr, const void *, BufferStorageMask> Binding::NamedBufferStorage("glNamedBufferStorage");
 Function<void, GLuint, GLsizeiptr, const void *, BufferStorageMask> Binding::NamedBufferStorageEXT("glNamedBufferStorageEXT");
 Function<void, GLuint, GLintptr, GLsizeiptr, GLeglClientBufferEXT, BufferStorageMask> Binding::NamedBufferStorageExternalEXT("glNamedBufferStorageExternalEXT");
@@ -65,9 +66,9 @@ Function<void, const GLbyte *> Binding::Normal3bv("glNormal3bv");
 Function<void, GLdouble, GLdouble, GLdouble> Binding::Normal3d("glNormal3d");
 Function<void, const GLdouble *> Binding::Normal3dv("glNormal3dv");
 Function<void, GLfloat, GLfloat, GLfloat> Binding::Normal3f("glNormal3f");
+Function<void, const GLfloat *> Binding::Normal3fv("glNormal3fv");
 Function<void, GLfloat, GLfloat, GLfloat, GLfloat, GLfloat, GLfloat> Binding::Normal3fVertex3fSUN("glNormal3fVertex3fSUN");
 Function<void, const GLfloat *, const GLfloat *> Binding::Normal3fVertex3fvSUN("glNormal3fVertex3fvSUN");
-Function<void, const GLfloat *> Binding::Normal3fv("glNormal3fv");
 Function<void, GLhalfNV, GLhalfNV, GLhalfNV> Binding::Normal3hNV("glNormal3hNV");
 Function<void, const GLhalfNV *> Binding::Normal3hvNV("glNormal3hvNV");
 Function<void, GLint, GLint, GLint> Binding::Normal3i("glNormal3i");
@@ -93,7 +94,6 @@ Function<void, GLenum, GLint, GLint, GLint> Binding::NormalStream3iATI("glNormal
 Function<void, GLenum, const GLint *> Binding::NormalStream3ivATI("glNormalStream3ivATI");
 Function<void, GLenum, GLshort, GLshort, GLshort> Binding::NormalStream3sATI("glNormalStream3sATI");
 Function<void, GLenum, const GLshort *> Binding::NormalStream3svATI("glNormalStream3svATI");
-
 
 
 } // namespace glbinding
