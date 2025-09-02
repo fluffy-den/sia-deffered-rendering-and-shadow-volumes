@@ -1,22 +1,31 @@
-// Copyright 2011-2019 the Polygon Mesh Processing Library developers.
+// Copyright 2011-2025 the Polygon Mesh Processing Library developers.
 // Distributed under a MIT-style license, see LICENSE.txt for details.
 
-#include "window.h"
+#define IMGUI_DEFINE_MATH_OPERATORS
+#include "imgui.h"
 
-#include <algorithm>
+#include "window.h"
+#include "font-lato.h"
+#include "font-awesome.h"
+#include "font-icons.h"
+
 #include <sstream>
 
-#define IMGUI_DISABLE_OBSOLETE_FUNCTIONS
-#include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
-#include <lato-font.h>
 #include <stb_image_write.h>
 
 #if __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 #include <emscripten/html5.h>
+#include <GL/gl.h>
+#else
+#define GLAD_GL_IMPLEMENTATION
+#include <glad/gl.h>
 #endif
+
+static inline float  ImTrunc(float f)         { return (float)(int)(f); }
+static inline ImVec2 ImTrunc(const ImVec2& v) { return ImVec2((float)(int)(v.x), (float)(int)(v.y)); }
 
 namespace pmp {
 
@@ -40,6 +49,7 @@ Window::Window(const char* title, int width, int height, bool showgui)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
     glfwWindowHint(GLFW_SAMPLES, 4);
+    glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
 
     window_ = glfwCreateWindow(width, height, title, nullptr, nullptr);
 
@@ -53,11 +63,20 @@ Window::Window(const char* title, int width, int height, bool showgui)
     glfwMakeContextCurrent(window_);
     instance_ = this;
 
+#ifndef __EMSCRIPTEN__
+    const auto version = gladLoadGL(glfwGetProcAddress);
+    if (version == 0)
+    {
+        std::cout << "Failed to initialize OpenGL context\n";
+        exit(EXIT_FAILURE);
+    }
+#endif
+
     // check for sufficient OpenGL version
     GLint major, minor;
     glGetIntegerv(GL_MAJOR_VERSION, &major);
     glGetIntegerv(GL_MINOR_VERSION, &minor);
-    GLint glversion = 10 * major + minor;
+    const GLint glversion = 10 * major + minor;
 #ifdef __EMSCRIPTEN__
     if (glversion < 30)
     {
@@ -81,18 +100,7 @@ Window::Window(const char* title, int width, int height, bool showgui)
     // enable v-sync
     glfwSwapInterval(1);
 
-    // now that we have a GL context, initialize GLEW
-    glewExperimental = GL_TRUE;
-    GLenum err = glewInit();
-    if (err != GLEW_OK)
-    {
-        std::cerr << "Error initializing GLEW: " << glewGetErrorString(err)
-                  << std::endl;
-        exit(1);
-    }
-
     // debug: print GL and GLSL version
-    std::cout << "GLEW   " << glewGetString(GLEW_VERSION) << std::endl;
     std::cout << "GL     " << glGetString(GL_VERSION) << std::endl;
     std::cout << "GLSL   " << glGetString(GL_SHADING_LANGUAGE_VERSION)
               << std::endl;
@@ -101,33 +109,22 @@ Window::Window(const char* title, int width, int height, bool showgui)
     glGetError();
 
     // detect highDPI framebuffer scaling and UI scaling
-    // this part is OS dependent:
-    // MacOS: just ratio of framebuffer size and window size
-    // Linux: use new GLFW content scaling
-    // Emscripten: use device pixel ratio
     int window_width, window_height, framebuffer_width, framebuffer_height;
     glfwGetWindowSize(window_, &window_width, &window_height);
     glfwGetFramebufferSize(window_, &framebuffer_width, &framebuffer_height);
     width_ = framebuffer_width;
     height_ = framebuffer_height;
-#ifndef __EMSCRIPTEN__
-    scaling_ = framebuffer_width / window_width;
+    scaling_ = static_cast<float>(framebuffer_width) /
+               static_cast<float>(window_width);
     if (scaling_ != 1)
         std::cout << "highDPI scaling: " << scaling_ << std::endl;
 
-#ifndef __APPLE__ // not needed for MacOS retina
+#if !defined(__APPLE__) && !defined(__EMSCRIPTEN__)
     float sx, sy;
     glfwGetWindowContentScale(window_, &sx, &sy);
     imgui_scale_ = std::max(1.0f, 0.5f * (sx + sy));
     if (imgui_scale_ != 1.0f)
         std::cout << "UI scaling: " << imgui_scale_ << std::endl;
-#endif
-
-#else
-    pixel_ratio_ = emscripten_get_device_pixel_ratio();
-    if (pixel_ratio_ != 1)
-        std::cout << "highDPI scaling: " << pixel_ratio_ << std::endl;
-    imgui_scale_ = pixel_ratio_;
 #endif
 
     // register glfw callbacks
@@ -139,6 +136,17 @@ Window::Window(const char* title, int width, int height, bool showgui)
     glfwSetScrollCallback(window_, glfw_scroll);
     glfwSetFramebufferSizeCallback(window_, glfw_resize);
     glfwSetDropCallback(window_, glfw_drop);
+    glfwSetWindowContentScaleCallback(window_, glfw_scale);
+
+#if defined(__EMSCRIPTEN__)
+    // touch event handlers
+    emscripten_set_touchstart_callback("#canvas", nullptr, true,
+                                       emscripten_touchstart);
+    emscripten_set_touchmove_callback("#canvas", nullptr, true,
+                                      emscripten_touchmove);
+    emscripten_set_touchend_callback("#canvas", nullptr, true,
+                                     emscripten_touchend);
+#endif
 
     // setup imgui
     init_imgui();
@@ -155,7 +163,7 @@ Window::Window(const char* title, int width, int height, bool showgui)
     // init mouse button state and modifiers
     for (bool& i : button_)
         i = false;
-    ctrl_pressed_ = shift_pressed_ = alt_pressed_ = false;
+    ctrl_pressed_ = shift_pressed_ = alt_pressed_ = super_pressed_ = false;
 }
 
 Window::~Window()
@@ -174,75 +182,93 @@ void Window::init_imgui()
     ImGuiIO& io = ImGui::GetIO();
     (void)io;
     io.IniFilename = nullptr;
-    ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(window_, false);
 #ifdef __EMSCRIPTEN__
-    const char* glsl_version = "#version 300 es";
+    ImGui_ImplOpenGL3_Init("#version 300 es");
+    ImGui_ImplGlfw_InstallEmscriptenCallbacks(window_, "#canvas");
 #else
-    const char* glsl_version = "#version 330";
+    ImGui_ImplOpenGL3_Init("#version 330");
 #endif
-    ImGui_ImplOpenGL3_Init(glsl_version);
 
-    // load Lato font from pre-compiled ttf file
-    io.Fonts->AddFontFromMemoryCompressedTTF(LatoLatin_compressed_data,
-                                             LatoLatin_compressed_size,
-                                             14 * imgui_scale_);
+    // setup font and border radii
+    scale_imgui(1.0);
 
-    // window style
-    ImGuiStyle& style = ImGui::GetStyle();
-    style.WindowBorderSize = 0;
-    style.WindowRounding = 4 * imgui_scale_;
-    style.FrameRounding = 4 * imgui_scale_;
-    style.GrabMinSize = 10 * imgui_scale_;
-    style.GrabRounding = 4 * imgui_scale_;
+    // setup colors
+    color_mode(color_mode_);
+}
 
-    // color scheme adapted from
-    // https://github.com/ocornut/imgui/pull/511#issuecomment-175719267
-    style.Colors[ImGuiCol_Text] = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
-    style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.60f, 0.60f, 0.60f, 1.00f);
-    style.Colors[ImGuiCol_WindowBg] = ImVec4(0.90f, 0.90f, 0.90f, 0.70f);
-    style.Colors[ImGuiCol_ChildBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
-    style.Colors[ImGuiCol_PopupBg] = ImVec4(0.90f, 0.90f, 0.90f, 0.90f);
-    style.Colors[ImGuiCol_Border] = ImVec4(0.00f, 0.00f, 0.00f, 0.39f);
-    style.Colors[ImGuiCol_BorderShadow] = ImVec4(1.00f, 1.00f, 1.00f, 0.10f);
-    style.Colors[ImGuiCol_FrameBg] = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
-    style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.16f, 0.62f, 0.87f, 0.40f);
-    style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.16f, 0.62f, 0.87f, 0.67f);
-    style.Colors[ImGuiCol_TitleBg] = ImVec4(0.16f, 0.62f, 0.87f, 0.80f);
-    style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.16f, 0.62f, 0.87f, 0.80f);
-    style.Colors[ImGuiCol_TitleBgCollapsed] =
-        ImVec4(0.16f, 0.62f, 0.87f, 0.40f);
-    style.Colors[ImGuiCol_MenuBarBg] = ImVec4(0.86f, 0.86f, 0.86f, 1.00f);
-    style.Colors[ImGuiCol_ScrollbarBg] = ImVec4(0.98f, 0.98f, 0.98f, 0.53f);
-    style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.69f, 0.69f, 0.69f, 0.80f);
-    style.Colors[ImGuiCol_ScrollbarGrabHovered] =
-        ImVec4(0.49f, 0.49f, 0.49f, 0.80f);
-    style.Colors[ImGuiCol_ScrollbarGrabActive] =
-        ImVec4(0.49f, 0.49f, 0.49f, 1.00f);
-    style.Colors[ImGuiCol_CheckMark] = ImVec4(0.16f, 0.62f, 0.87f, 1.00f);
-    style.Colors[ImGuiCol_SliderGrab] = ImVec4(0.16f, 0.62f, 0.87f, 0.78f);
-    style.Colors[ImGuiCol_SliderGrabActive] =
-        ImVec4(0.16f, 0.62f, 0.87f, 1.00f);
-    style.Colors[ImGuiCol_Button] = ImVec4(0.16f, 0.62f, 0.87f, 0.40f);
-    style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.16f, 0.62f, 0.87f, 1.00f);
-    style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.16f, 0.62f, 0.87f, 1.00f);
-    style.Colors[ImGuiCol_Header] = ImVec4(0.16f, 0.62f, 0.87f, 0.31f);
-    style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.16f, 0.62f, 0.87f, 0.80f);
-    style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.16f, 0.62f, 0.87f, 1.00f);
-    style.Colors[ImGuiCol_ResizeGrip] = ImVec4(1.00f, 1.00f, 1.00f, 0.00f);
-    style.Colors[ImGuiCol_ResizeGripHovered] =
-        ImVec4(0.16f, 0.62f, 0.87f, 0.67f);
-    style.Colors[ImGuiCol_ResizeGripActive] =
-        ImVec4(0.16f, 0.62f, 0.87f, 0.95f);
-    style.Colors[ImGuiCol_PlotLines] = ImVec4(0.39f, 0.39f, 0.39f, 1.00f);
-    style.Colors[ImGuiCol_PlotLinesHovered] =
-        ImVec4(1.00f, 0.43f, 0.35f, 1.00f);
-    style.Colors[ImGuiCol_PlotHistogram] = ImVec4(0.90f, 0.70f, 0.00f, 1.00f);
-    style.Colors[ImGuiCol_PlotHistogramHovered] =
-        ImVec4(1.00f, 0.60f, 0.00f, 1.00f);
-    style.Colors[ImGuiCol_TextSelectedBg] = ImVec4(0.16f, 0.62f, 0.87f, 0.35f);
-    style.Colors[ImGuiCol_ModalWindowDimBg] =
-        ImVec4(0.20f, 0.20f, 0.20f, 0.70f);
+void Window::color_mode(ColorMode c)
+{
+    ImVec4* colors = ImGui::GetStyle().Colors;
+
+    switch (color_mode_ = c)
+    {
+        case LightMode:
+            ImGui::StyleColorsLight();
+            colors[ImGuiCol_WindowBg] = ImVec4(0.90f, 0.90f, 0.90f, 0.90f);
+            colors[ImGuiCol_Border] = colors[ImGuiCol_WindowBg];
+            clear_color_ = vec3(1.0, 1.0, 1.0);
+            break;
+
+        case DarkMode:
+            ImGui::StyleColorsDark();
+            colors[ImGuiCol_WindowBg] = ImVec4(0.1, 0.1, 0.1, 0.9);
+            colors[ImGuiCol_Border] = colors[ImGuiCol_WindowBg];
+            clear_color_ = vec3(0.15, 0.16, 0.17);
+            break;
+    }
+
+#ifdef TUDO // color scheme of TU Dortmund
+
+    ImVec4 fg, bg, bg_active, bg_inactive, bg_light, grey;
+    switch (color_mode_)
+    {
+        case LightMode:
+        {
+            fg = ImVec4(0,0,0,1);
+            bg = ImVec4(0.58, 0.75, 0.27, 1.0);
+            bg_active = ImVec4(0.39, 0.60, 0.0, 1.0);
+            bg_inactive = ImVec4(0.7, 0.7, 0.7, 1.0);
+            bg_light = ImVec4(0.76, 0.89, 0.54, 1.0);
+            grey = ImVec4(0.8, 0.8, 0.8, 1.0);
+            break;
+        }
+
+        case DarkMode:
+            fg = ImVec4(1,1,1,1);
+            bg = ImVec4(0.39, 0.60, 0.0, 1.0);
+            bg_active = ImVec4(0.49, 0.65, 0.16, 1.0);
+            bg_inactive = ImVec4(0.7, 0.7, 0.7, 1.0);
+            bg_light = ImVec4(0.18, 0.27, 0.0, 1.0);
+            grey = ImVec4(0.2, 0.2, 0.2, 1.0);
+            break;
+    }
+
+    colors[ImGuiCol_Text]                   = fg;
+    colors[ImGuiCol_TitleBg]                = bg;
+    colors[ImGuiCol_TitleBgActive]          = bg_active;
+    colors[ImGuiCol_FrameBg]                = grey;
+    colors[ImGuiCol_FrameBgHovered]         = bg_light;
+    colors[ImGuiCol_FrameBgActive]          = bg_light;
+    colors[ImGuiCol_CheckMark]              = bg_active;
+    colors[ImGuiCol_SliderGrab]             = bg_active;
+    colors[ImGuiCol_SliderGrabActive]       = bg_active;
+    colors[ImGuiCol_Button]                 = bg;
+    colors[ImGuiCol_ButtonHovered]          = bg_active;
+    colors[ImGuiCol_ButtonActive]           = bg_active;
+    colors[ImGuiCol_Header]                 = bg;
+    colors[ImGuiCol_HeaderHovered]          = bg_active;
+    colors[ImGuiCol_HeaderActive]           = bg;
+    colors[ImGuiCol_Separator]              = bg;
+    colors[ImGuiCol_SeparatorHovered]       = bg;
+    colors[ImGuiCol_SeparatorActive]        = bg_light;
+    colors[ImGuiCol_Tab]                    = grey;
+    colors[ImGuiCol_TabSelected]            = bg;
+    colors[ImGuiCol_TabSelectedOverline]    = bg;
+    colors[ImGuiCol_TabHovered]             = bg_active;
+    colors[ImGuiCol_TabDimmed]              = bg_active;
+    colors[ImGuiCol_TabDimmedSelected]      = bg_active;
+#endif
 }
 
 void Window::scale_imgui(float scale)
@@ -250,12 +276,20 @@ void Window::scale_imgui(float scale)
     // scale imgui scale by new factor
     imgui_scale_ *= scale;
 
-    // reload font
+    // load Lato font 
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->Clear();
     io.Fonts->AddFontFromMemoryCompressedTTF(LatoLatin_compressed_data,
                                              LatoLatin_compressed_size,
-                                             14 * imgui_scale_);
+                                             16 * imgui_scaling());
+    
+    // load & merge FontAwesome
+    static const ImWchar icons_ranges[] = {ICON_MIN_FA, ICON_MAX_FA, 0};
+    ImFontConfig config;
+    config.MergeMode = true;
+    io.Fonts->AddFontFromMemoryCompressedTTF(
+        FontAwesome_compressed_data, FontAwesome_compressed_size,
+        16 * imgui_scaling(), &config, icons_ranges);
 
     // trigger font texture regeneration
     ImGui_ImplOpenGL3_DestroyFontsTexture();
@@ -263,21 +297,30 @@ void Window::scale_imgui(float scale)
 
     // adjust element styles (scaled version of default style or pmp style)
     ImGuiStyle& style = ImGui::GetStyle();
-    style.WindowPadding = ImVec2(8 * scale, 8 * scale);
-    style.WindowRounding = 4 * scale;
-    style.FramePadding = ImVec2(4 * scale, 2 * scale);
-    style.FrameRounding = 4 * scale;
-    style.ItemSpacing = ImVec2(8 * scale, 4 * scale);
-    style.ItemInnerSpacing = ImVec2(4 * scale, 4 * scale);
-    style.IndentSpacing = 21 * scale;
-    style.ColumnsMinSpacing = 6 * scale;
-    style.ScrollbarSize = 16 * scale;
-    style.ScrollbarRounding = 9 * scale;
-    style.GrabMinSize = 10 * scale;
-    style.GrabRounding = 4 * scale;
-    style.TabRounding = 4 * scale;
-    style.DisplayWindowPadding = ImVec2(19 * scale, 19 * scale);
-    style.DisplaySafeAreaPadding = ImVec2(3 * scale, 3 * scale);
+    style.WindowPadding = ImTrunc(ImVec2(8,8) * imgui_scale_);
+    style.WindowRounding = 0; //ImTrunc(4 * imgui_scale_);
+    style.WindowMinSize = ImTrunc(ImVec2(24,24) * imgui_scale_);
+    style.ChildRounding = ImTrunc(4 * imgui_scale_);
+    style.PopupRounding = ImTrunc(4 * imgui_scale_);
+    style.FramePadding = ImTrunc(ImVec2(4,3) * imgui_scale_);
+    style.FrameRounding = ImTrunc(4 * imgui_scale_);
+    style.ItemSpacing = ImTrunc(ImVec2(8,4) * imgui_scale_);
+    style.ItemInnerSpacing = ImTrunc(ImVec2(4,4) * imgui_scale_);
+    style.CellPadding = ImTrunc(ImVec2(4,2) * imgui_scale_);
+    style.TouchExtraPadding = ImVec2(0,0);
+    style.IndentSpacing = ImTrunc(21 * imgui_scale_);
+    style.ColumnsMinSpacing = ImTrunc(6 * imgui_scale_);
+    style.ScrollbarSize = ImTrunc(14 * imgui_scale_);
+    style.ScrollbarRounding = ImTrunc(9 * imgui_scale_);
+    style.GrabMinSize = ImTrunc(10 * imgui_scale_);
+    style.GrabRounding = ImTrunc(4 * imgui_scale_);
+    style.LogSliderDeadzone = ImTrunc(4 * imgui_scale_);
+    style.TabRounding = ImTrunc(4 * imgui_scale_);
+    style.TabMinWidthForCloseButton = ImTrunc(0 * imgui_scale_);
+    style.TabBarOverlineSize = ImTrunc(1 * imgui_scale_);
+    style.SeparatorTextPadding = ImTrunc(ImVec2(20,3) * imgui_scale_);
+    style.DisplayWindowPadding = ImTrunc(ImVec2(19,19) * imgui_scale_);
+    style.DisplaySafeAreaPadding = ImTrunc(ImVec2(3,3) * imgui_scale_);
 }
 
 void Window::add_help_item(std::string key, std::string description, int pos)
@@ -299,9 +342,9 @@ void Window::clear_help_items()
     help_items_.clear();
 }
 
-void Window::show_help()
+void Window::draw_help_dialog()
 {
-    if (!show_help_)
+    if (!show_help())
         return;
 
     ImGui::OpenPopup("Key Bindings");
@@ -346,14 +389,103 @@ void Window::show_help()
     }
 }
 
+void Window::draw_imgui()
+{
+    // start window
+    ImGui::SetNextWindowBgAlpha(show_imgui_ ? 0.8 : 0.0);
+    ImGui::SetNextWindowPos(ImVec2(4, 4), ImGuiCond_Once);
+    ImGui::Begin(
+        "GUI", nullptr,
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize);
+
+    if (show_imgui_)
+    {
+        // icons toolbar
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 30 * imgui_scale_);
+        ImGui::BeginGroup();
+
+        ImVec2 icon_size(35 * imgui_scale_, 35 * imgui_scale_);
+        float icon_spacing = 20 * imgui_scale_;
+
+        if (ImGui::Button(ICON_FA_XMARK, icon_size))
+        {
+            show_imgui_ = false;
+        }
+
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + icon_spacing);
+
+        if (color_mode() == LightMode)
+        {
+            if (ImGui::Button(ICON_FA_MOON, icon_size))
+                color_mode(DarkMode);
+        }
+        else
+        {
+            if (ImGui::Button(ICON_FA_SUN, icon_size))
+                color_mode(LightMode);
+        }
+
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + icon_spacing);
+
+        if (is_fullscreen())
+        {
+            if (ImGui::Button(ICON_FA_DOWN_LEFT_AND_UP_RIGHT_TO_CENTER,
+                              icon_size))
+                exit_fullscreen();
+        }
+        else
+        {
+            if (ImGui::Button(ICON_FA_UP_RIGHT_AND_DOWN_LEFT_FROM_CENTER,
+                              icon_size))
+                enter_fullscreen();
+        }
+
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + icon_spacing);
+
+        if (ImGui::Button(ICON_FA_QUESTION, icon_size))
+        {
+            show_help(true);
+        }
+
+        ImGui::EndGroup();
+        ImGui::PopStyleVar();
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // application's GUI
+        process_imgui();
+
+        // show help window?
+        if (show_help())
+            draw_help_dialog();
+    }
+    else
+    {
+        ImVec2 icon_size(35 * imgui_scale_, 35 * imgui_scale_);
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 30 * imgui_scale_);
+        if (ImGui::Button(ICON_FA_BARS, icon_size))
+        {
+            show_imgui_ = true;
+        }
+        ImGui::PopStyleVar();
+    }
+
+    ImGui::End();
+}
+
 int Window::run()
 {
 #if __EMSCRIPTEN__
-    emscripten_set_main_loop(Window::render_frame, 0, 1);
+    emscripten_set_main_loop(Window::render_frame_, 0, 1);
 #else
     while (!glfwWindowShouldClose(window_))
     {
-        Window::render_frame();
+        Window::render_frame_();
     }
 #endif
     return EXIT_SUCCESS;
@@ -361,68 +493,43 @@ int Window::run()
 
 void Window::render_frame()
 {
-    glfwMakeContextCurrent(instance_->window_);
+    glfwMakeContextCurrent(window_);
 
 #if __EMSCRIPTEN__
-    // determine correct canvas/framebuffer size
-    int w, h, f;
+    // dynamicall adjust window size based on container
     double dw, dh;
-    emscripten_get_canvas_element_size("#canvas", &w, &h);
-    emscripten_get_element_css_size("#canvas", &dw, &dh);
-    double s = instance_->pixel_ratio_;
-    if (w != int(dw * s) || h != int(dh * s))
-    {
-        // set canvas size to match element css size
-        w = int(dw * s);
-        h = int(dh * s);
-        emscripten_set_canvas_element_size("#canvas", w, h);
-        glfw_resize(instance_->window_, w, h);
-    }
+    emscripten_get_element_css_size("#canvas_container", &dw, &dh);
+    glfwSetWindowSize(window_, (int)dw, (int)dh);
 #endif
 
     // do some computations
-    instance_->do_processing();
+    do_processing();
 
-    // prepare and process ImGUI elements
-    if (instance_->show_imgui())
-    {
-        // start imgui frame
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-#if __EMSCRIPTEN__
-        // Emscripten problem: glfwGetWindowSize() does not giving correct size
-        // in ImGui_ImplGlfw_NewFrame(). We have to correct this, after calling NewFrame()
-        // and before calling ImGUI::NewFrame()
-        ImGui::GetIO().DisplaySize = ImVec2(w, h);
-#endif
-        ImGui::NewFrame();
+    // (re)determine scaling
+    int window_width, window_height, framebuffer_width, framebuffer_height;
+    glfwGetWindowSize(window_, &window_width, &window_height);
+    glfwGetFramebufferSize(instance_->window_, &framebuffer_width,
+                           &framebuffer_height);
+    scaling_ = static_cast<float>(framebuffer_width) /
+               static_cast<float>(window_width);
 
-        // prepare, process, and finish applications ImGUI dialog
-        ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Once);
-        ImGui::Begin(
-            "Mesh Info", nullptr,
-            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize);
-        ImGui::Text("Press '?' for help");
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-        instance_->process_imgui();
-        ImGui::End();
+    // setup viewport
+    glViewport(0, 0, framebuffer_width, framebuffer_height);
 
-        // show imgui help
-        instance_->show_help();
-
-        ImGui::Render();
-    }
+    // clear buffers
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClearColor(clear_color_[0], clear_color_[1], clear_color_[2], 0.0);
 
     // draw scene
-    instance_->display();
+    display();
 
     // draw GUI
-    if (instance_->show_imgui())
-    {
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-    }
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+    draw_imgui();
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
 #if __EMSCRIPTEN__
     // to avoid problems with premultiplied alpha in WebGL,
@@ -439,7 +546,7 @@ void Window::render_frame()
 #endif
 
     // swap buffers
-    glfwSwapBuffers(instance_->window_);
+    glfwSwapBuffers(window_);
 
     // handle events
     glfwPollEvents();
@@ -463,25 +570,30 @@ void Window::glfw_keyboard(GLFWwindow* window, int key, int scancode,
                            int action, int mods)
 {
     ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
+
+    // remember modifier status
+    switch (key)
+    {
+        case GLFW_KEY_LEFT_CONTROL:
+        case GLFW_KEY_RIGHT_CONTROL:
+            instance_->ctrl_pressed_ = (action != GLFW_RELEASE);
+            break;
+        case GLFW_KEY_LEFT_SHIFT:
+        case GLFW_KEY_RIGHT_SHIFT:
+            instance_->shift_pressed_ = (action != GLFW_RELEASE);
+            break;
+        case GLFW_KEY_LEFT_ALT:
+        case GLFW_KEY_RIGHT_ALT:
+            instance_->alt_pressed_ = (action != GLFW_RELEASE);
+            break;
+        case GLFW_KEY_LEFT_SUPER:
+        case GLFW_KEY_RIGHT_SUPER:
+            instance_->super_pressed_ = (action != GLFW_RELEASE);
+            break;
+    }
+
     if (!ImGui::GetIO().WantCaptureKeyboard)
     {
-        // remember modifier status
-        switch (key)
-        {
-            case GLFW_KEY_LEFT_CONTROL:
-            case GLFW_KEY_RIGHT_CONTROL:
-                instance_->ctrl_pressed_ = (action != GLFW_RELEASE);
-                break;
-            case GLFW_KEY_LEFT_SHIFT:
-            case GLFW_KEY_RIGHT_SHIFT:
-                instance_->shift_pressed_ = (action != GLFW_RELEASE);
-                break;
-            case GLFW_KEY_LEFT_ALT:
-            case GLFW_KEY_RIGHT_ALT:
-                instance_->alt_pressed_ = (action != GLFW_RELEASE);
-                break;
-        }
-
         // send event to window
         instance_->keyboard(key, scancode, action, mods);
     }
@@ -546,50 +658,22 @@ void Window::keyboard(int key, int /*code*/, int action, int /*mods*/)
     }
 }
 
-// fullscreen handling from here:
-// https://github.com/emscripten-core/emscripten/issues/5124
-
-#ifdef __EMSCRIPTEN__
-
 bool Window::is_fullscreen() const
 {
+#ifdef __EMSCRIPTEN__
     EmscriptenFullscreenChangeEvent fsce;
     emscripten_get_fullscreen_status(&fsce);
     return fsce.isFullscreen;
-}
-
-void Window::enter_fullscreen()
-{
-    // get screen size
-    int w = EM_ASM_INT({ return screen.width; });
-    int h = EM_ASM_INT({ return screen.height; });
-
-    // Workaround https://github.com/kripken/emscripten/issues/5124#issuecomment-292849872
-    EM_ASM(JSEvents.inEventHandler = true);
-    EM_ASM(JSEvents.currentEventHandler = {allowsDeferredCalls : true});
-
-    // remember window size
-    glfwGetWindowSize(window_, &backup_width_, &backup_height_);
-
-    // setting window to screen size triggers fullscreen mode
-    glfwSetWindowSize(window_, w, h);
-}
-
-void Window::exit_fullscreen()
-{
-    emscripten_exit_fullscreen();
-    glfwSetWindowSize(window_, backup_width_, backup_height_);
-}
-
 #else
-
-bool Window::is_fullscreen() const
-{
     return glfwGetWindowMonitor(window_) != nullptr;
+#endif
 }
 
 void Window::enter_fullscreen()
 {
+#ifdef __EMSCRIPTEN__
+    emscripten_request_fullscreen("#canvas_container", false);
+#else
     // get monitor
     GLFWmonitor* monitor = glfwGetPrimaryMonitor();
 
@@ -603,28 +687,48 @@ void Window::enter_fullscreen()
     // switch to fullscreen on primary monitor
     glfwSetWindowMonitor(window_, monitor, 0, 0, mode->width, mode->height,
                          GLFW_DONT_CARE);
+#endif
 }
 
 void Window::exit_fullscreen()
 {
+#ifdef __EMSCRIPTEN__
+    emscripten_exit_fullscreen();
+#else
     glfwSetWindowMonitor(window_, nullptr, backup_xpos_, backup_ypos_,
                          backup_width_, backup_height_, GLFW_DONT_CARE);
+#endif
 }
 
-#endif
-
-void Window::glfw_motion(GLFWwindow* /*window*/, double xpos, double ypos)
+void Window::glfw_motion(GLFWwindow* window, double xpos, double ypos)
 {
-    // correct for highDPI scaling
-    instance_->motion(instance_->scaling_ * xpos, instance_->scaling_ * ypos);
+    ImGui_ImplGlfw_CursorPosCallback(window, xpos, ypos);
+
+    if (!ImGui::GetIO().WantCaptureMouse)
+    {
+        // correct for highDPI scaling
+        instance_->motion(instance_->scaling_ * xpos,
+                          instance_->scaling_ * ypos);
+    }
 }
 
 void Window::glfw_mouse(GLFWwindow* window, int button, int action, int mods)
 {
+// #ifdef __EMSCRIPTEN__
+    // since touch input does not trigger hover events,
+    // we have to set mouse position before button press.
+    // since we cannot distinguish mouse and touch events,
+    // we simply do this all the time.
+    double x, y;
+    glfwGetCursorPos(window, &x, &y);
+    ImGui_ImplGlfw_CursorPosCallback(window, x, y);
+// #endif
+
     ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
+
+    instance_->button_[button] = (action == GLFW_PRESS);
     if (!ImGui::GetIO().WantCaptureMouse)
     {
-        instance_->button_[button] = (action == GLFW_PRESS);
         instance_->mouse(button, action, mods);
     }
 }
@@ -661,6 +765,11 @@ void Window::glfw_drop(GLFWwindow* /*window*/, int count, const char** paths)
     instance_->drop(count, paths);
 }
 
+void Window::glfw_scale(GLFWwindow* /*window*/, float xscale, float yscale)
+{
+    instance_->scaling_ = std::max(1.0, 0.5 * (xscale + yscale));
+}
+
 void Window::cursor_pos(double& x, double& y) const
 {
     glfwGetCursorPos(window_, &x, &y);
@@ -690,5 +799,40 @@ void Window::screenshot()
     // clean up
     delete[] data;
 }
+
+#if __EMSCRIPTEN__
+
+EM_BOOL Window::emscripten_touchstart(int, const EmscriptenTouchEvent* evt,
+                                      void*)
+{
+    instance_->touchstart(evt);
+    return EM_TRUE;
+}
+
+EM_BOOL Window::emscripten_touchmove(int, const EmscriptenTouchEvent* evt,
+                                     void*)
+{
+    instance_->touchmove(evt);
+    return EM_TRUE;
+}
+
+EM_BOOL Window::emscripten_touchend(int, const EmscriptenTouchEvent* evt, void*)
+{
+    instance_->touchend(evt);
+    return EM_TRUE;
+}
+
+extern "C" {
+EMSCRIPTEN_KEEPALIVE void light_mode()
+{
+    pmp::Window::light_mode();
+}
+
+EMSCRIPTEN_KEEPALIVE void dark_mode()
+{
+    pmp::Window::dark_mode();
+}
+}
+#endif
 
 } // namespace pmp

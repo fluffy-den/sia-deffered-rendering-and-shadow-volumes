@@ -3,11 +3,8 @@
 // Distributed under a MIT-style license, see LICENSE.txt for details.
 
 #include "pmp/algorithms/laplace.h"
-#include "pmp/algorithms/differential_geometry.h"
 
 namespace pmp {
-
-//=== hidden internal functions =====================================================
 
 namespace {
 
@@ -127,7 +124,7 @@ void polygon_mass_matrix(const DenseMatrix& polygon, DiagonalMatrix& Mpoly)
     // compute position of virtual vertex
     Eigen::VectorXd vweights;
     compute_virtual_vertex(polygon, vweights);
-    Eigen::Vector3d vvertex = polygon.transpose() * vweights;
+    const Eigen::Vector3d vvertex = polygon.transpose() * vweights;
 
     // laplace matrix of refined triangle fan
     DenseMatrix Mfan = DenseMatrix::Zero(n + 1, n + 1);
@@ -209,7 +206,7 @@ void polygon_laplace_matrix(const DenseMatrix& polygon, DenseMatrix& Lpoly)
     // compute position of virtual vertex
     Eigen::VectorXd vweights;
     compute_virtual_vertex(polygon, vweights);
-    Eigen::Vector3d vvertex = polygon.transpose() * vweights;
+    const Eigen::Vector3d vvertex = polygon.transpose() * vweights;
 
     // laplace matrix of refined triangle fan
     DenseMatrix Lfan = DenseMatrix::Zero(n + 1, n + 1);
@@ -261,7 +258,7 @@ void polygon_gradient_matrix(const DenseMatrix& polygon, DenseMatrix& Gpoly)
     // compute position of virtual vertex
     Eigen::VectorXd vweights;
     compute_virtual_vertex(polygon, vweights);
-    Eigen::Vector3d vvertex = polygon.transpose() * vweights;
+    const Eigen::Vector3d vvertex = polygon.transpose() * vweights;
 
     DenseMatrix Gfan = DenseMatrix::Zero(3 * n, n + 1);
     DenseMatrix Gtri(3, 3);
@@ -311,11 +308,11 @@ void divmass_matrix(const SurfaceMesh& mesh, DiagonalMatrix& M)
 
     unsigned int idx = 0;
 
-    for (Face f : mesh.faces())
+    for (const auto f : mesh.faces())
     {
         // collect polygon vertices
         vertices.clear();
-        for (Vertex v : mesh.vertices(f))
+        for (const auto v : mesh.vertices(f))
         {
             vertices.push_back(v);
         }
@@ -331,7 +328,7 @@ void divmass_matrix(const SurfaceMesh& mesh, DiagonalMatrix& M)
         // compute position of virtual vertex
         Eigen::VectorXd vweights;
         compute_virtual_vertex(polygon, vweights);
-        Eigen::Vector3d vvertex = polygon.transpose() * vweights;
+        const Eigen::Vector3d vvertex = polygon.transpose() * vweights;
 
         for (int i = 0; i < n; ++i)
         {
@@ -348,8 +345,6 @@ void divmass_matrix(const SurfaceMesh& mesh, DiagonalMatrix& M)
 }
 
 } // anonymous namespace
-
-//=== public functions  ==============================================================
 
 void uniform_mass_matrix(const SurfaceMesh& mesh, DiagonalMatrix& M)
 {
@@ -369,11 +364,11 @@ void mass_matrix(const SurfaceMesh& mesh, DiagonalMatrix& M)
 
     M.setZero(nv);
 
-    for (Face f : mesh.faces())
+    for (const auto f : mesh.faces())
     {
         // collect polygon vertices
         vertices.clear();
-        for (Vertex v : mesh.vertices(f))
+        for (const auto v : mesh.vertices(f))
         {
             vertices.push_back(v);
         }
@@ -430,11 +425,11 @@ void laplace_matrix(const SurfaceMesh& mesh, SparseMatrix& L, bool clamp)
     std::vector<Triplet> triplets;
     triplets.reserve(9 * nf); // estimate for triangle meshes
 
-    for (Face f : mesh.faces())
+    for (const auto f : mesh.faces())
     {
         // collect polygon vertices
         vertices.clear();
-        for (Vertex v : mesh.vertices(f))
+        for (const auto v : mesh.vertices(f))
         {
             vertices.push_back(v);
         }
@@ -510,11 +505,11 @@ void gradient_matrix(const SurfaceMesh& mesh, SparseMatrix& G)
 
     unsigned int n_rows = 0;
 
-    for (Face f : mesh.faces())
+    for (const auto f : mesh.faces())
     {
         // collect polygon vertices
         vertices.clear();
-        for (Vertex v : mesh.vertices(f))
+        for (const auto v : mesh.vertices(f))
         {
             vertices.push_back(v);
         }
@@ -556,20 +551,6 @@ void divergence_matrix(const SurfaceMesh& mesh, SparseMatrix& D)
     DiagonalMatrix M;
     divmass_matrix(mesh, M);
     D = -G.transpose() * M;
-}
-
-void coordinates_to_matrix(const SurfaceMesh& mesh, DenseMatrix& X)
-{
-    X.resize(mesh.n_vertices(), 3);
-    for (auto v : mesh.vertices())
-        X.row(v.idx()) = static_cast<Eigen::Vector3d>(mesh.position(v));
-}
-
-void matrix_to_coordinates(const DenseMatrix& X, SurfaceMesh& mesh)
-{
-    assert((size_t)X.rows() == mesh.n_vertices() && X.cols() == 3);
-    for (auto v : mesh.vertices())
-        mesh.position(v) = X.row(v.idx());
 }
 
 } // namespace pmp

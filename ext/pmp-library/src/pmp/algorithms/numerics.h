@@ -32,9 +32,10 @@ DenseMatrix cholesky_solve(const SparseMatrix& A, const DenseMatrix& B);
 //! \param B The right hand side.
 //! \param is_constrained A function returning whether or not X(i) is constrained or not.
 //! \param C A matrix storing the Dirichlet constraints: X(i) should be C(i) is entry i is constrained.
-DenseMatrix cholesky_solve(const SparseMatrix& A, const DenseMatrix& B,
-                           std::function<bool(unsigned int)> is_constrained,
-                           const DenseMatrix& C);
+DenseMatrix cholesky_solve(
+    const SparseMatrix& A, const DenseMatrix& B,
+    const std::function<bool(unsigned int)>& is_constrained,
+    const DenseMatrix& C);
 
 //! Constructs a selector matrix for a mesh with N vertices.
 //! Returns a matrix built from the rows of the NxN identity matrix that belong to selected vertices.
@@ -42,7 +43,8 @@ DenseMatrix cholesky_solve(const SparseMatrix& A, const DenseMatrix& B,
 //! \param is_selected A function returning whether or not vertex i is selected or not.
 //! \param S The output matrix.
 void selector_matrix(const SurfaceMesh& mesh,
-                     std::function<bool(Vertex)> is_selected, SparseMatrix& S);
+                     const std::function<bool(Vertex)>& is_selected,
+                     SparseMatrix& S);
 
 //! Build SurfaceMesh from Eigen matrices containing vertex coordinates and triangle indices.
 //! \param V \f$n\times 3\f$ matrix of double precision vertex coordinates.
@@ -57,5 +59,17 @@ void matrices_to_mesh(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F,
 //! \param F The resulting \f$m\times 3\f$ matrix of integer triangle indices.
 void mesh_to_matrices(const SurfaceMesh& mesh, Eigen::MatrixXd& V,
                       Eigen::MatrixXi& F);
+
+//! For a mesh with N vertices, construct an Nx3 matrix containing the vertex coordinates in its rows.
+//! \param mesh The input mesh.
+//! \param X The output matrix.
+//! \ingroup algorithms
+void coordinates_to_matrix(const SurfaceMesh& mesh, DenseMatrix& X);
+
+//! For a mesh with N vertices, set the vertex coordinates from the rows of an Nx3 matrix.
+//! \param X The input matrix.
+//! \param mesh The mesh.
+//! \ingroup algorithms
+void matrix_to_coordinates(const DenseMatrix& X, SurfaceMesh& mesh);
 
 } // namespace pmp

@@ -10,6 +10,7 @@ set(GOOGLE_TEST_SOURCES
     ${PROJECT_SOURCE_DIR}/${GOOGLE_TEST_ROOT}/src/gtest_main.cc)
 
 add_library(googletest STATIC ${GOOGLE_TEST_SOURCES})
+target_compile_features(googletest PUBLIC cxx_std_14)
 
 # set output path so that coverage testing works
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR})
@@ -19,6 +20,10 @@ file(COPY ${PROJECT_SOURCE_DIR}/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 # source files
 file(GLOB SOURCES ./*.cpp)
+
+if(NOT PMP_BUILD_REGRESSIONS)
+  list(FILTER SOURCES EXCLUDE REGEX ".*regression_test\\.cpp$")
+endif()
 
 # build test runner
 add_executable(gtest_runner ${SOURCES})
@@ -31,9 +36,6 @@ endif()
 
 add_dependencies(gtest_runner googletest)
 
-# add runner as test
-add_test(gtest_runner ${CMAKE_CURRENT_BINARY_DIR}/gtest_runner)
-
 # copy dlls on windows
 if(WIN32 AND BUILD_SHARED_LIBS)
   add_custom_command(
@@ -44,3 +46,8 @@ if(WIN32 AND BUILD_SHARED_LIBS)
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:googletest>
             $<TARGET_FILE_DIR:gtest_runner>)
 endif()
+
+# automatic test discovery has to go *after* dll copy above, otherwise
+# gtest_runner does not work
+include(GoogleTest)
+gtest_discover_tests(gtest_runner)

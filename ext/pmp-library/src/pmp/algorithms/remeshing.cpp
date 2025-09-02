@@ -6,9 +6,9 @@
 #include <cmath>
 
 #include <algorithm>
-#include <stdexcept>
 #include <memory>
 #include <limits>
+#include <numbers>
 
 #include "pmp/algorithms/curvature.h"
 #include "pmp/algorithms/normals.h"
@@ -124,7 +124,7 @@ void TriangleKdTree::build_recurse(Node* node, unsigned int max_faces,
         length = bb[(axis = 2)];
 
     // split in the middle
-    Scalar split = bbox.center()[axis];
+    const Scalar split = bbox.center()[axis];
 
     // create children
     auto* left = new Node();
@@ -193,7 +193,7 @@ void TriangleKdTree::build_recurse(Node* node, unsigned int max_faces,
         node->left_child = left;
         node->right_child = right;
 
-        // recurse to childen
+        // recurse to children
         build_recurse(node->left_child, max_faces, depth - 1);
         build_recurse(node->right_child, max_faces, depth - 1);
     }
@@ -230,7 +230,7 @@ void TriangleKdTree::nearest_recurse(Node* node, const Point& point,
     // non-terminal node
     else
     {
-        Scalar dist = point[node->axis] - node->split;
+        const Scalar dist = point[node->axis] - node->split;
 
         if (dist <= 0.0)
         {
@@ -455,7 +455,7 @@ void Remeshing::preprocessing()
         // robust and gives better results on the boundary.
         // don't smooth curvatures here, since it does not take feature edges
         // into account.
-        curvature(mesh_, Curvature::max_abs, 0, true, false);
+        curvature(mesh_, Curvature::MaxAbs, 0, true, false);
         auto curvatures = mesh_.get_vertex_property<Scalar>("v:curv");
 
         // smooth curvatures while taking feature edges into account
@@ -521,7 +521,7 @@ void Remeshing::preprocessing()
         // now convert per-vertex curvature into target edge length
         for (auto v : mesh_.vertices())
         {
-            Scalar c = vsizing_[v];
+            const Scalar c = vsizing_[v];
 
             // get edge length from curvature
             const Scalar r = 1.0 / c;
@@ -536,7 +536,7 @@ void Remeshing::preprocessing()
             else
             {
                 // this does not really make sense
-                h = e * 3.0 / sqrt(3.0);
+                h = e * 3.0 / std::numbers::sqrt3;
             }
 
             // clamp to min. and max. edge length
@@ -601,18 +601,18 @@ void Remeshing::project_to_reference(Vertex v)
     const Face f = nn.face;
 
     // get face data
-    auto fvIt = refmesh_->vertices(f);
-    const Point p0 = refpoints_[*fvIt];
-    const Point n0 = refnormals_[*fvIt];
-    const Scalar s0 = refsizing_[*fvIt];
-    ++fvIt;
-    const Point p1 = refpoints_[*fvIt];
-    const Point n1 = refnormals_[*fvIt];
-    const Scalar s1 = refsizing_[*fvIt];
-    ++fvIt;
-    const Point p2 = refpoints_[*fvIt];
-    const Point n2 = refnormals_[*fvIt];
-    const Scalar s2 = refsizing_[*fvIt];
+    auto fv = refmesh_->vertices(f);
+    const Point p0 = refpoints_[*fv];
+    const Point n0 = refnormals_[*fv];
+    const Scalar s0 = refsizing_[*fv];
+    ++fv;
+    const Point p1 = refpoints_[*fv];
+    const Point n1 = refnormals_[*fv];
+    const Scalar s1 = refsizing_[*fv];
+    ++fv;
+    const Point p2 = refpoints_[*fv];
+    const Point n2 = refnormals_[*fv];
+    const Scalar s2 = refsizing_[*fv];
 
     // get barycentric coordinates
     Point b = barycentric_coordinates(p, p0, p1, p2);
@@ -640,8 +640,7 @@ void Remeshing::project_to_reference(Vertex v)
 void Remeshing::split_long_edges()
 {
     Vertex vnew, v0, v1;
-    Edge enew, e0, e1;
-    Face f0, f1, f2, f3;
+    Edge enew;
     bool ok, is_feature, is_boundary;
     int i;
 
@@ -764,7 +763,7 @@ void Remeshing::collapse_short_edges()
                         hcol10 = false;
 
                     // topological rules
-                    bool collapse_ok = mesh_.is_collapse_ok(h01);
+                    const bool collapse_ok = mesh_.is_collapse_ok(h01);
 
                     if (hcol01)
                         hcol01 = collapse_ok;
@@ -920,8 +919,7 @@ void Remeshing::flip_edges()
 
 void Remeshing::tangential_smoothing(unsigned int iterations)
 {
-    Vertex v1, v2, v3, vv;
-    Edge e;
+    Vertex vv;
     Scalar w, ww;
     Point u, n, t, b;
 
@@ -1045,8 +1043,8 @@ void Remeshing::remove_caps()
 {
     Halfedge h;
     Vertex v, vb, vd;
-    Face fb, fd;
-    Scalar a0, a1, amin, aa(::cos(170.0 * M_PI / 180.0));
+    Scalar a0, a1, amin;
+    const Scalar aa(::cos(170.0 * std::numbers::pi / 180.0));
     Point a, b, c, d;
 
     for (auto e : mesh_.edges())
@@ -1166,7 +1164,7 @@ Point Remeshing::weighted_centroid(Vertex v)
         if (area == 0)
             area = 1.0;
 
-        double w =
+        const double w =
             area / pow((vsizing_[v1] + vsizing_[v2] + vsizing_[v3]) / 3.0, 2.0);
 
         p += w * b;

@@ -7,6 +7,9 @@
 #include "pmp/algorithms/differential_geometry.h"
 #include "pmp/algorithms/laplace.h"
 
+#include <algorithm>
+#include <numbers>
+
 namespace pmp {
 
 class CurvatureAnalyzer
@@ -112,7 +115,7 @@ void CurvatureAnalyzer::analyze(unsigned int post_smoothing_steps)
             }
 
             mean = 0.5 * LX.row(v.idx()).norm() / area;
-            gauss = (2.0 * M_PI - sum_angles) / area;
+            gauss = (2.0 * std::numbers::pi - sum_angles) / area;
 
             const Scalar s = sqrt(std::max(Scalar(0.0), mean * mean - gauss));
             kmin = mean - s;
@@ -227,8 +230,8 @@ void CurvatureAnalyzer::analyze_tensor(unsigned int post_smoothing_steps,
             tensor /= A;
 
             // Eigen-decomposition
-            bool ok = symmetric_eigendecomposition(tensor, eval1, eval2, eval3,
-                                                   evec1, evec2, evec3);
+            const bool ok = symmetric_eigendecomposition(
+                tensor, eval1, eval2, eval3, evec1, evec2, evec3);
             if (ok)
             {
                 // curvature values:
@@ -320,6 +323,9 @@ void CurvatureAnalyzer::set_boundary_curvatures()
 
 void CurvatureAnalyzer::smooth_curvatures(unsigned int iterations)
 {
+    if (iterations == 0)
+        return;
+
     // Laplace matrix (clamp negative cotan weights to zero)
     SparseMatrix L;
     laplace_matrix(mesh_, L, true);
@@ -327,8 +333,8 @@ void CurvatureAnalyzer::smooth_curvatures(unsigned int iterations)
     // normalize each row by sum of weights
     // scale by 0.5 to make it more robust
     // multiply by -1 to make it neg. definite again
-    DiagonalMatrix D = L.diagonal().asDiagonal().inverse();
-    L = -0.5 * D * L;
+    const DiagonalMatrix D = -0.5 * L.diagonal().asDiagonal().inverse();
+    L = D * L;
 
     // copy vertex curvatures to matrix
     const int n = mesh_.n_vertices();
@@ -365,13 +371,13 @@ void curvature_to_texture_coordinates(SurfaceMesh& mesh)
     {
         values.push_back(curvatures[v]);
     }
-    std::sort(values.begin(), values.end());
-    unsigned int n = values.size() - 1;
+    std::ranges::sort(values);
+    const unsigned int n = values.size() - 1;
     // std::cout << "curvatures in [" << values[0] << ", " << values[n] << "]\n";
 
     // clamp upper/lower 5%
-    unsigned int i = n / 20;
-    Scalar kmin = values[i];
+    const unsigned int i = n / 20;
+    const Scalar kmin = values[i];
     Scalar kmax = values[n - 1 - i];
 
     // generate 1D texture coordinates
@@ -406,31 +412,31 @@ void curvature(SurfaceMesh& mesh, Curvature c, int smoothing_steps,
 
     switch (c)
     {
-        case Curvature::min:
+        case Curvature::Min:
         {
             for (auto v : mesh.vertices())
                 curvatures[v] = analyzer.min_curvature(v);
             break;
         }
-        case Curvature::max:
+        case Curvature::Max:
         {
             for (auto v : mesh.vertices())
                 curvatures[v] = analyzer.max_curvature(v);
             break;
         }
-        case Curvature::mean:
+        case Curvature::Mean:
         {
             for (auto v : mesh.vertices())
-                curvatures[v] = fabs(analyzer.mean_curvature(v));
+                curvatures[v] = analyzer.mean_curvature(v);
             break;
         }
-        case Curvature::gauss:
+        case Curvature::Gauss:
         {
             for (auto v : mesh.vertices())
                 curvatures[v] = analyzer.gauss_curvature(v);
             break;
         }
-        case Curvature::max_abs:
+        case Curvature::MaxAbs:
         {
             for (auto v : mesh.vertices())
                 curvatures[v] = analyzer.max_abs_curvature(v);

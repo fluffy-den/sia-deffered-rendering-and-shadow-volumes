@@ -38,6 +38,13 @@ void Viewer::process_imgui()
 
     if (ImGui::CollapsingHeader("Subdivision", ImGuiTreeNodeFlags_DefaultOpen))
     {
+        static bool preserve_boundary = false;
+        ImGui::Checkbox("Preserve Boundary", &preserve_boundary);
+
+        const auto boundary_handling = preserve_boundary
+                                           ? BoundaryHandling::Preserve
+                                           : BoundaryHandling::Interpolate;
+
         if (ImGui::Button("Triangulate Mesh"))
         {
             triangulate(mesh_);
@@ -55,20 +62,26 @@ void Viewer::process_imgui()
             }
             else
             {
-                loop_subdivision(mesh_);
+                loop_subdivision(mesh_, boundary_handling);
                 update_mesh();
             }
         }
 
         if (ImGui::Button("Catmull-Clark Subdivision"))
         {
-            catmull_clark_subdivision(mesh_);
+            catmull_clark_subdivision(mesh_, boundary_handling);
             update_mesh();
         }
 
         if (ImGui::Button("Quad/Tri Subdivision"))
         {
-            quad_tri_subdivision(mesh_);
+            quad_tri_subdivision(mesh_, boundary_handling);
+            update_mesh();
+        }
+
+        if (ImGui::Button("Linear subdivision"))
+        {
+            linear_subdivision(mesh_);
             update_mesh();
         }
     }

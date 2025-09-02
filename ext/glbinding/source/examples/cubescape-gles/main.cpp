@@ -15,7 +15,7 @@
 #include <glbinding-aux/types_to_string.h>
 #include <glbinding-aux/ValidVersions.h>
 
-#include "CubeScape.h"
+#include <CubeScape.h>
 
 
 using namespace gl;
@@ -97,9 +97,7 @@ int main(int, char *[])
             std::cout << "error: " << error << std::endl;
     });
 
-    Binding::initialize([](const char * name) {
-        return glfwGetProcAddress(name);
-    }, false); // only resolve functions that are actually used (lazy)
+    Binding::initialize(glfwGetProcAddress, false); // only resolve functions that are actually used (lazy)
 
     // print some gl infos (query)
 

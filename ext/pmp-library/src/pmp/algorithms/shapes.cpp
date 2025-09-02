@@ -5,8 +5,10 @@
 #include "pmp/algorithms/subdivision.h"
 #include "pmp/algorithms/differential_geometry.h"
 
+#include <algorithm>
 #include <cmath>
 #include <algorithm>
+#include <numbers>
 
 namespace pmp {
 namespace {
@@ -24,10 +26,10 @@ void project_to_unit_sphere(SurfaceMesh& mesh)
 SurfaceMesh tetrahedron()
 {
     SurfaceMesh mesh;
-    float a = 1.0f / 3.0f;
-    float b = sqrt(8.0f / 9.0f);
-    float c = sqrt(2.0f / 9.0f);
-    float d = sqrt(2.0f / 3.0f);
+    const float a = 1.0f / 3.0f;
+    const float b = sqrt(8.0f / 9.0f);
+    const float c = sqrt(2.0f / 9.0f);
+    const float d = sqrt(2.0f / 3.0f);
 
     auto v0 = mesh.add_vertex(Point(0, 0, 1));
     auto v1 = mesh.add_vertex(Point(-c, d, -a));
@@ -46,7 +48,7 @@ SurfaceMesh hexahedron()
 {
     SurfaceMesh mesh;
 
-    float a = 1.0f / sqrt(3.0f);
+    const float a = std::numbers::inv_sqrt3_v<float>;
     auto v0 = mesh.add_vertex(Point(-a, -a, -a));
     auto v1 = mesh.add_vertex(Point(a, -a, -a));
     auto v2 = mesh.add_vertex(Point(a, a, -a));
@@ -86,9 +88,9 @@ SurfaceMesh icosahedron()
 {
     SurfaceMesh mesh;
 
-    float phi = (1.0f + sqrt(5.0f)) * 0.5f; // golden ratio
-    float a = 1.0f;
-    float b = 1.0f / phi;
+    const float phi = (1.0f + sqrt(5.0f)) * 0.5f; // golden ratio
+    const float a = 1.0f;
+    const float b = 1.0f / phi;
 
     auto v1 = mesh.add_vertex(Point(0, b, -a));
     auto v2 = mesh.add_vertex(Point(b, a, 0));
@@ -158,50 +160,51 @@ SurfaceMesh uv_sphere(const Point& center, Scalar radius, size_t n_slices,
     SurfaceMesh mesh;
 
     // add top vertex
-    auto v0 = mesh.add_vertex(Point(center[0], center[1] + radius, center[2]));
+    const auto top = Point(center[0], center[1] + radius, center[2]);
+    const auto v0 = mesh.add_vertex(top);
 
     // generate vertices per stack / slice
     for (size_t i = 0; i < n_stacks - 1; i++)
     {
-        auto phi = M_PI * double(i + 1) / double(n_stacks);
+        const auto phi = std::numbers::pi * double(i + 1) / double(n_stacks);
         for (size_t j = 0; j < n_slices; ++j)
         {
-            auto theta = 2.0 * M_PI * double(j) / double(n_slices);
-            auto x = center[0] + radius * std::sin(phi) * std::cos(theta);
-            auto y = center[1] + radius * std::cos(phi);
-            auto z = center[2] + radius * std::sin(phi) * std::sin(theta);
+            const auto theta =
+                2.0 * std::numbers::pi * double(j) / double(n_slices);
+            const auto x = center[0] + radius * std::sin(phi) * std::cos(theta);
+            const auto y = center[1] + radius * std::cos(phi);
+            const auto z = center[2] + radius * std::sin(phi) * std::sin(theta);
             mesh.add_vertex(Point(x, y, z));
         }
     }
 
     // add bottom vertex
-    auto v1 = mesh.add_vertex(Point(center[0], center[1] - radius, center[2]));
+    const auto bottom = Point(center[0], center[1] - radius, center[2]);
+    const auto v1 = mesh.add_vertex(bottom);
 
     // add top / bottom triangles
-    size_t i0, i1;
     for (size_t i = 0; i < n_slices; ++i)
     {
-        i0 = i + 1;
-        i1 = (i + 1) % n_slices + 1;
+        const auto i0 = i + 1;
+        const auto i1 = (i + 1) % n_slices + 1;
         mesh.add_triangle(v0, Vertex(i1), Vertex(i0));
 
-        i0 = i + n_slices * (n_stacks - 2) + 1;
-        i1 = (i + 1) % n_slices + n_slices * (n_stacks - 2) + 1;
-        mesh.add_triangle(v1, Vertex(i0), Vertex(i1));
+        const auto i2 = i + n_slices * (n_stacks - 2) + 1;
+        const auto i3 = (i + 1) % n_slices + n_slices * (n_stacks - 2) + 1;
+        mesh.add_triangle(v1, Vertex(i2), Vertex(i3));
     }
 
     // add quads per stack / slice
-    size_t i2, i3;
     for (size_t j = 0; j < n_stacks - 2; ++j)
     {
-        size_t idx0 = j * n_slices + 1;
-        size_t idx1 = (j + 1) * n_slices + 1;
+        const auto idx0 = j * n_slices + 1;
+        const auto idx1 = (j + 1) * n_slices + 1;
         for (size_t i = 0; i < n_slices; ++i)
         {
-            i0 = idx0 + i;
-            i1 = idx0 + (i + 1) % n_slices;
-            i2 = idx1 + (i + 1) % n_slices;
-            i3 = idx1 + i;
+            const auto i0 = idx0 + i;
+            const auto i1 = idx0 + (i + 1) % n_slices;
+            const auto i2 = idx1 + (i + 1) % n_slices;
+            const auto i3 = idx1 + i;
             mesh.add_quad(Vertex(i0), Vertex(i1), Vertex(i2), Vertex(i3));
         }
     }
@@ -254,10 +257,10 @@ SurfaceMesh cone(size_t n_subdivisions, Scalar radius, Scalar height)
     std::vector<Vertex> base_vertices;
     for (size_t i = 0; i < n_subdivisions; i++)
     {
-        Scalar ratio = static_cast<Scalar>(i) / (n_subdivisions);
-        Scalar r = ratio * (M_PI * 2.0);
-        Scalar x = std::cos(r) * radius;
-        Scalar y = std::sin(r) * radius;
+        const Scalar ratio = static_cast<Scalar>(i) / (n_subdivisions);
+        const Scalar r = ratio * (std::numbers::pi * 2.0);
+        const Scalar x = std::cos(r) * radius;
+        const Scalar y = std::sin(r) * radius;
         auto v = mesh.add_vertex(Point(x, y, 0.0));
         base_vertices.push_back(v);
     }
@@ -273,7 +276,7 @@ SurfaceMesh cone(size_t n_subdivisions, Scalar radius, Scalar height)
     }
 
     // reverse order for consistent face orientation
-    std::reverse(base_vertices.begin(), base_vertices.end());
+    std::ranges::reverse(base_vertices);
 
     // add polygonal base face
     mesh.add_face(base_vertices);
@@ -292,10 +295,10 @@ SurfaceMesh cylinder(size_t n_subdivisions, Scalar radius, Scalar height)
     std::vector<Vertex> top_vertices;
     for (size_t i = 0; i < n_subdivisions; i++)
     {
-        Scalar ratio = static_cast<Scalar>(i) / (n_subdivisions);
-        Scalar r = ratio * (M_PI * 2.0);
-        Scalar x = std::cos(r) * radius;
-        Scalar y = std::sin(r) * radius;
+        const Scalar ratio = static_cast<Scalar>(i) / (n_subdivisions);
+        const Scalar r = ratio * (std::numbers::pi * 2.0);
+        const Scalar x = std::cos(r) * radius;
+        const Scalar y = std::sin(r) * radius;
         Vertex v = mesh.add_vertex(Point(x, y, 0.0));
         bottom_vertices.push_back(v);
         v = mesh.add_vertex(Point(x, y, height));
@@ -316,7 +319,7 @@ SurfaceMesh cylinder(size_t n_subdivisions, Scalar radius, Scalar height)
     mesh.add_face(top_vertices);
 
     // reverse order for consistent face orientation
-    std::reverse(bottom_vertices.begin(), bottom_vertices.end());
+    std::ranges::reverse(bottom_vertices);
 
     // add bottom polygon
     mesh.add_face(bottom_vertices);
@@ -337,11 +340,13 @@ SurfaceMesh torus(size_t radial_resolution, size_t tubular_resolution,
     {
         for (size_t j = 0; j < tubular_resolution; j++)
         {
-            Scalar u = static_cast<Scalar>(j) / tubular_resolution * M_PI * 2.0;
-            Scalar v = static_cast<Scalar>(i) / radial_resolution * M_PI * 2.0;
-            Scalar x = (radius + thickness * std::cos(v)) * std::cos(u);
-            Scalar y = (radius + thickness * std::cos(v)) * std::sin(u);
-            Scalar z = thickness * std::sin(v);
+            const Scalar u = static_cast<Scalar>(j) / tubular_resolution *
+                             std::numbers::pi * 2.0;
+            const Scalar v = static_cast<Scalar>(i) / radial_resolution *
+                             std::numbers::pi * 2.0;
+            const Scalar x = (radius + thickness * std::cos(v)) * std::cos(u);
+            const Scalar y = (radius + thickness * std::cos(v)) * std::sin(u);
+            const Scalar z = thickness * std::sin(v);
             mesh.add_vertex(Point(x, y, z));
         }
     }

@@ -19,6 +19,12 @@ div.header .title {
   font-size: 2.25em;
 }
 
+/* group header margins */
+div.groupHeader {
+  margin-left: 0;
+  margin-bottom: 1em;
+}
+
 /* figure caption font and margin */
 div.caption {
   font-weight: normal;
@@ -52,4 +58,9 @@ dl.citelist dt {
   height: 60vh;
   border: 1px solid #dedede;
   border-radius: 3px;
+}
+
+div.toc h3,
+div.toc li {
+  font-family: var(--font-family);
 }

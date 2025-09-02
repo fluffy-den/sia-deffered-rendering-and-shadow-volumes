@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16.3)
 cmake_policy(SET CMP0048 NEW)
 project(
   pmp-library
-  VERSION 2.0.1
+  VERSION 3.0.0
   DESCRIPTION "The Polygon Mesh Processing Library"
   HOMEPAGE_URL "https://www.pmp-library.org")
 cmake_policy(SET CMP0072 NEW)
@@ -13,6 +13,7 @@ option(PMP_BUILD_DOCS "Build the PMP documentation" ON)
 option(PMP_BUILD_VIS "Build the PMP visualization tools" ON)
 option(PMP_INSTALL "Install the PMP library and headers" ON)
 option(PMP_STRICT_COMPILATION "Treat compiler warnings as errors" ON)
+option(PMP_BUILD_REGRESSIONS "Build the PMP regression test programs" OFF)
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 
 # set output paths
@@ -23,9 +24,9 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 if(PMP_BUILD_VIS)
-  set(GLFW_SOURCE_DIR "external/glfw-3.3.8")
-  set(GLEW_SOURCE_DIR "external/glew-2.2.0")
-  set(IMGUI_SOURCE_DIR "external/imgui-1.89.8")
+  set(GLFW_SOURCE_DIR_INTERNAL "external/glfw-3.4")
+  set(GLAD_SOURCE_DIR "external/glad-2.0.8")
+  set(IMGUI_SOURCE_DIR "external/imgui-1.91.8")
   set(STB_IMAGE_SOURCE_DIR "external/stb_image-2.28")
   set(STB_IMAGE_WRITE_SOURCE_DIR "external/stb_image_write-1.16")
 
@@ -49,17 +50,16 @@ if(PMP_BUILD_VIS)
       OFF
       CACHE BOOL "")
 
-  # setup use of GLFW and GLEW
-  if(NOT EMSCRIPTEN)
-    add_subdirectory(${GLFW_SOURCE_DIR} ${GLEW_SOURCE_DIR})
+  # disable GLFW wayland support if scanner is not found. See #207
+  find_program(WAYLAND_SCANNER_EXECUTABLE NAMES wayland-scanner)
+  if(NOT WAYLAND_SCANNER_EXECUTABLE)
+    set(GLFW_BUILD_WAYLAND False)
+  endif()
 
-    add_definitions(-DGLEW_STATIC)
-    add_library(glew STATIC ${GLEW_SOURCE_DIR}/src/glew.c
-                            ${GLEW_SOURCE_DIR}/include)
-    set_property(TARGET glew PROPERTY POSITION_INDEPENDENT_CODE ON)
-    target_include_directories(glew PUBLIC ${GLEW_SOURCE_DIR}/include
-                                           ${GLFW_SOURCE_DIR}/include)
-    target_link_libraries(glew ${GLFW_LIBRARIES})
+  # setup use of GLFW and GLAD
+  if(NOT EMSCRIPTEN)
+    add_subdirectory(${GLFW_SOURCE_DIR_INTERNAL})
+    include_directories(${GLAD_SOURCE_DIR}/include)
   endif()
 
   # setup IMGUI
@@ -93,15 +93,12 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug"
     COMMAND
       ${LCOV} --directory . --capture --exclude '*/external/*' --exclude
       '*/tests/*' --exclude '/usr/*' --exclude '/Applications/*' --exclude
-      'v1/*' --output-file coverage.info
+      'v1/*' --output-file coverage.info --ignore-errors unused
     # generate report
     COMMAND ${GENHTML} --demangle-cpp -o coverage coverage.info
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # set default compiler flags for both gcc and clang
@@ -140,7 +137,7 @@ if(EMSCRIPTEN)
   add_compile_options(-fexceptions)
   add_link_options(-fexceptions)
   add_link_options(
-    "SHELL:-sWASM=1 -sUSE_WEBGL2=1 -sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sALLOW_TABLE_GROWTH=1 -sSTACK_SIZE=5MB"
+    "SHELL:-sWASM=1 -sUSE_WEBGL2=1 -sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sALLOW_TABLE_GROWTH=1 -sSTACK_SIZE=5MB -sEXPORTED_RUNTIME_METHODS=[ccall]"
   )
   set(CMAKE_EXECUTABLE_SUFFIX ".html")
 endif()
@@ -156,8 +153,13 @@ if(NOT CMAKE_BUILD_TYPE)
         FORCE)
 endif()
 
-if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+if(${CMAKE_BUILD_TYPE} STREQUAL "Debug" AND NOT WIN32)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ggdb")
+endif()
+
+# TU Dortmund color scheme
+if (TUDO)
+  add_definitions(-DTUDO)
 endif()
 
 # choose size of the scalar type

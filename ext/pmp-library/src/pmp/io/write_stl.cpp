@@ -6,7 +6,6 @@
 #include "pmp/exceptions.h"
 
 #include <fstream>
-#include <array>
 #include <ios>
 #include <iterator>
 
@@ -19,7 +18,7 @@ void write_binary_stl(const SurfaceMesh& mesh,
     std::ofstream ofs(file.string(), std::ios::binary);
 
     // write 80 byte header
-    std::string header{"Binary STL export from PMP"};
+    const std::string header{"Binary STL export from PMP"};
     ofs.write(header.c_str(), header.size());
     std::fill_n(std::ostream_iterator<char>(ofs), 80 - header.size(), ' ');
 

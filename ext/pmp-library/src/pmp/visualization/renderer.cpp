@@ -11,6 +11,8 @@
 #include "pmp/visualization/cold_warm_texture.h"
 #include "pmp/algorithms/normals.h"
 
+#include <numbers>
+
 namespace pmp {
 
 Renderer::Renderer(const SurfaceMesh& mesh) : mesh_(mesh)
@@ -43,7 +45,7 @@ Renderer::Renderer(const SurfaceMesh& mesh) : mesh_(mesh)
     use_srgb_ = false;
     use_colors_ = true;
     crease_angle_ = 180.0;
-    point_size_ = 5.0;
+    point_size_ = 5;
 
     // initialize texture
     texture_ = 0;
@@ -62,11 +64,11 @@ Renderer::~Renderer()
     glDeleteVertexArrays(1, &vertex_array_object_);
 }
 
-void Renderer::load_texture(const char* filename, GLint format,
+void Renderer::load_texture(const std::filesystem::path& filename, GLint format,
                             GLint min_filter, GLint mag_filter, GLint wrap)
 {
 #ifdef __EMSCRIPTEN__
-    // emscripen/WebGL does not like mapmapping for SRGB textures
+    // emscripten/WebGL does not like mipmapping for SRGB textures
     if ((min_filter == GL_NEAREST_MIPMAP_NEAREST ||
          min_filter == GL_NEAREST_MIPMAP_LINEAR ||
          min_filter == GL_LINEAR_MIPMAP_NEAREST ||
@@ -101,10 +103,9 @@ void Renderer::load_texture(const char* filename, GLint format,
     int width, height, n;
     stbi_set_flip_vertically_on_load(true);
     unsigned char* img =
-        stbi_load(filename, &width, &height, &n, load_components);
+        stbi_load(filename.string().c_str(), &width, &height, &n, load_components);
     if (!img)
-        throw IOException("Failed to load texture file: " +
-                          std::string(filename));
+        throw IOException("Failed to load texture file: " + filename.string());
 
     // delete old texture
     glDeleteTextures(1, &texture_);
@@ -140,7 +141,7 @@ void Renderer::load_texture(const char* filename, GLint format,
     texture_mode_ = TextureMode::Other;
 }
 
-void Renderer::load_matcap(const char* filename)
+void Renderer::load_matcap(const std::filesystem::path& filename)
 {
     try
     {
@@ -260,7 +261,9 @@ void Renderer::update_opengl_buffers()
     auto fcolor = mesh_.get_face_property<Color>("f:color");
 
     // index array for remapping vertex indices during duplication
-    std::vector<size_t> vertex_indices(mesh_.n_vertices());
+    // note: use vertices_size() instead of n_vertices() to also
+    // take deleted vertices into account
+    std::vector<size_t> vertex_indices(mesh_.vertices_size());
 
     // produce arrays of points, normals, and texcoords
     // (duplicate vertices to allow for flat shading)
@@ -285,17 +288,21 @@ void Renderer::update_opengl_buffers()
         // precompute normals for easy cases
         std::vector<Normal> face_normals;
         std::vector<Normal> vertex_normals;
-        face_normals.reserve(mesh_.n_faces());
-        vertex_normals.reserve(mesh_.n_vertices());
         if (crease_angle_ < 1)
         {
+            // note: use faces_size() instead of n_faces() to
+            // take deleted faces into account
+            face_normals.resize(mesh_.faces_size());
             for (auto f : mesh_.faces())
-                face_normals.emplace_back(face_normal(mesh_, f));
+                face_normals[f.idx()] = face_normal(mesh_, f);
         }
         else if (crease_angle_ > 170)
         {
+            // note: use vertices_size() instead of n_vertices() to
+            // take deleted vertices into account
+            vertex_normals.resize(mesh_.vertices_size());
             for (auto v : mesh_.vertices())
-                vertex_normals.emplace_back(vertex_normal(mesh_, v));
+                vertex_normals[v.idx()] = vertex_normal(mesh_, v);
         }
 
         // data per face (for all corners)
@@ -307,7 +314,8 @@ void Renderer::update_opengl_buffers()
         std::vector<vec2> corner_texcoords;
 
         // convert from degrees to radians
-        const Scalar crease_angle_radians = crease_angle_ / 180.0 * M_PI;
+        const Scalar crease_angle_radians =
+            crease_angle_ / 180.0 * std::numbers::pi;
 
         size_t vidx(0);
 
@@ -366,12 +374,12 @@ void Renderer::update_opengl_buffers()
             assert(corner_vertices.size() >= 3);
 
             // tessellate face into triangles
-            tesselate(corner_positions, triangles);
+            tessellate(corner_positions, triangles);
             for (auto& t : triangles)
             {
-                int i0 = t[0];
-                int i1 = t[1];
-                int i2 = t[2];
+                const int i0 = t[0];
+                const int i1 = t[1];
+                const int i2 = t[2];
 
                 position_array.push_back(corner_positions[i0]);
                 position_array.push_back(corner_positions[i1]);
@@ -595,16 +603,16 @@ void Renderer::draw(const mat4& projection_matrix, const mat4& modelview_matrix,
     glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
 
     // setup matrices
-    mat4 mv_matrix = modelview_matrix;
-    mat4 mvp_matrix = projection_matrix * modelview_matrix;
-    mat3 n_matrix = inverse(transpose(linear_part(mv_matrix)));
+    const mat4 mv_matrix = modelview_matrix;
+    const mat4 mvp_matrix = projection_matrix * modelview_matrix;
+    const mat3 n_matrix = inverse(transpose(linear_part(mv_matrix)));
 
     // setup shader
     phong_shader_.use();
     phong_shader_.set_uniform("modelview_projection_matrix", mvp_matrix);
     phong_shader_.set_uniform("modelview_matrix", mv_matrix);
     phong_shader_.set_uniform("normal_matrix", n_matrix);
-    phong_shader_.set_uniform("point_size", point_size_);
+    phong_shader_.set_uniform("point_size", (float)point_size_);
     phong_shader_.set_uniform("light1", vec3(1.0, 1.0, 1.0));
     phong_shader_.set_uniform("light2", vec3(-1.0, 1.0, 1.0));
     phong_shader_.set_uniform("front_color", front_color_);
@@ -617,6 +625,7 @@ void Renderer::draw(const mat4& projection_matrix, const mat4& modelview_matrix,
     phong_shader_.set_uniform("use_lighting", true);
     phong_shader_.set_uniform("use_texture", false);
     phong_shader_.set_uniform("use_srgb", false);
+    phong_shader_.set_uniform("use_round_points", false);
     phong_shader_.set_uniform("show_texture_layout", false);
     phong_shader_.set_uniform("use_vertex_color",
                               has_vertex_colors_ && use_colors_);
@@ -625,6 +634,7 @@ void Renderer::draw(const mat4& projection_matrix, const mat4& modelview_matrix,
 
     if (draw_mode == "Points")
     {
+        phong_shader_.set_uniform("use_round_points", true);
 #ifndef __EMSCRIPTEN__
         glEnable(GL_PROGRAM_POINT_SIZE);
 #endif
@@ -732,11 +742,11 @@ void Renderer::draw(const mat4& projection_matrix, const mat4& modelview_matrix,
     glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
 
     glBindVertexArray(0);
-    glCheckError();
+    check_gl_errors();
 }
 
-void Renderer::tesselate(const std::vector<vec3>& points,
-                         std::vector<ivec3>& triangles)
+void Renderer::tessellate(const std::vector<vec3>& points,
+                          std::vector<ivec3>& triangles)
 {
     const int n = points.size();
 
@@ -817,11 +827,11 @@ void Renderer::tesselate(const std::vector<vec3>& points,
     {
         ivec2 tri = todo.back();
         todo.pop_back();
-        int start = tri[0];
-        int end = tri[1];
+        const int start = tri[0];
+        const int end = tri[1];
         if (end - start < 2)
             continue;
-        int split = triangulation(start, end).split;
+        const int split = triangulation(start, end).split;
 
         triangles.emplace_back(start, split, end);
 

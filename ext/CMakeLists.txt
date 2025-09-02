@@ -59,7 +59,7 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "")
 set(GLFW_BUILD_TESTS    OFF CACHE BOOL "")
 set(GLFW_BUILD_DOCS     OFF CACHE BOOL "")
 set(GLFW_INSTALL        OFF CACHE BOOL "")
-add_subdirectory(glfw)
+add_subdirectory(pmp-library/external/glfw-3.4)
 
 # GLBINDING
 set(BUILD_SHARED_LIBS     OFF CACHE BOOL "")
@@ -81,16 +81,16 @@ add_subdirectory(pmp-library)
 
 # Dear Imgui
 file(GLOB IMGUI_SOURCE_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/imgui/*.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends/imgui_impl_glfw.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends/imgui_impl_opengl3.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/pmp-library/external/imgui-1.91.8/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/pmp-library/external/imgui-1.91.8/imgui_impl_glfw.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/pmp-library/external/imgui-1.91.8/imgui_impl_opengl3.cpp
 )
-set(IMGUI_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/imgui/)
+set(IMGUI_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/pmp-library/external/imgui-1.91.8/)
 
-set(GLFW_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/glfw/include)
+set(GLFW_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/pmp-library/external/glfw-3.4/include)
 set(GLBINDING_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/glbinding/source/glbinding/include)
 set(GLBINDING_AUX_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/glbinding/source/glbinding-aux/include)
-set(EIGEN_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/eigen3)
+set(EIGEN_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/pmp-library/external/eigen-3.4.0)
 set(PMP_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/pmp-library/src/)
 set(SOIL_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/SOIL2/src/SOIL2/)
 

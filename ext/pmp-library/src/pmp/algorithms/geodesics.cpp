@@ -4,9 +4,11 @@
 #include "pmp/algorithms/geodesics.h"
 #include "pmp/algorithms/laplace.h"
 
+#include <algorithm>
 #include <cassert>
 #include <set>
 #include <map>
+#include <numbers>
 
 namespace pmp {
 namespace {
@@ -99,7 +101,7 @@ void Geodesics::find_virtual_edges()
     Scalar f, alpha, beta, tan_beta;
 
     const Scalar one(1.0), minus_one(-1.0);
-    const Scalar max_angle = 90.0 / 180.0 * M_PI;
+    const Scalar max_angle = 90.0 / 180.0 * std::numbers::pi;
     const Scalar max_angle_cos = cos(max_angle);
 
     virtual_edges_.clear();
@@ -212,7 +214,7 @@ unsigned int Geodesics::compute(const std::vector<Vertex>& seed, Scalar maxdist,
     // sort one-ring neighbors of seed vertices
     if (neighbors)
     {
-        std::sort(neighbors->begin(), neighbors->end(), VertexCmp(distance_));
+        std::ranges::sort(*neighbors, VertexCmp(distance_));
     }
 
     // correct if seed vertices have more than maxnum neighbors
@@ -337,7 +339,7 @@ void Geodesics::heap_vertex(Vertex v)
 {
     assert(!processed_[v]);
 
-    Vertex v0, v1, vv, v0_min, v1_min;
+    Vertex v0, v1, vv;
     Scalar dist, dist_min(std::numeric_limits<Scalar>::max()), d;
     typename VirtualEdges::const_iterator ve_it, ve_end(virtual_edges_.end());
     bool found(false);
@@ -552,24 +554,24 @@ void geodesics_heat(SurfaceMesh& mesh, const std::vector<Vertex>& seed)
     L = D * G;
 
     // diffusion time step (squared mean edge length)
-    double h = max_diagonal_length(mesh);
+    const double h = max_diagonal_length(mesh);
     const double dt = h * h;
 
     // solve heat diffusion from seed points
-    SparseMatrix A = SparseMatrix(M) - dt * L;
+    const SparseMatrix A = SparseMatrix(M) - dt * L;
     Eigen::SparseVector<double> b(n);
     for (auto s : seed)
     {
         b.coeffRef(s.idx()) = 1.0;
     }
-    Eigen::VectorXd heat = cholesky_solve(A, b);
+    const Eigen::VectorXd heat = cholesky_solve(A, b);
 
     // compute and normalize heat gradient
     Eigen::VectorXd grad = G * heat;
     for (int i = 0; i < grad.rows(); i += 3)
     {
         dvec3& g = *reinterpret_cast<dvec3*>(&grad[i]);
-        double ng = norm(g);
+        const double ng = norm(g);
         if (ng > std::numeric_limits<double>::min())
         {
             g /= ng;
@@ -580,7 +582,7 @@ void geodesics_heat(SurfaceMesh& mesh, const std::vector<Vertex>& seed)
     Eigen::VectorXd dist = cholesky_solve(L, D * (-grad));
 
     // shift distances value such that min dist is zero
-    double mindist = dist.minCoeff();
+    const double mindist = dist.minCoeff();
     for (int i = 0; i < dist.rows(); ++i)
     {
         dist[i] -= mindist;

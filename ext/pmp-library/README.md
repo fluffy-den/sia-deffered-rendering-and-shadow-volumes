@@ -3,13 +3,14 @@
 [![build](https://github.com/pmp-library/pmp-library/workflows/build/badge.svg)](https://github.com/pmp-library/pmp-library/actions?query=workflow%3Abuild)
 [![Coverage Status](https://coveralls.io/repos/github/pmp-library/pmp-library/badge.svg?branch=master)](https://coveralls.io/github/pmp-library/pmp-library?branch=main)
 [![Latest Release](https://img.shields.io/github/v/release/pmp-library/pmp-library?sort=semver)](https://github.com/pmp-library/pmp-library/releases/latest)
+[![DOI](https://zenodo.org/badge/105374301.svg)](https://zenodo.org/doi/10.5281/zenodo.10866531)
 
 The Polygon Mesh Processing Library is a modern C++ open-source library for processing and visualizing polygon surface meshes. Its main features are:
 
 - An efficient and easy-to-use mesh data structure
 - Standard algorithms such as decimation, remeshing, subdivision, or smoothing
 - Ready-to-use visualization tools
-- Seamless cross-compilation to JavaScript ([demo](https://www.pmp-library.org/mpview.html))
+- Seamless cross-compilation to JavaScript ([demo](https://www.pmp-library.org/demos/mpview.html))
 
 ## Get Started
 
@@ -35,8 +36,9 @@ Build your own tool:
 
 ```cpp
 #include <pmp/surface_mesh.h>
+#include <pmp/io/io.h>
 
-int main(void)
+int main()
 {
     pmp::SurfaceMesh mesh;
     pmp::read(mesh,"input.obj");
@@ -58,11 +60,14 @@ Contributions to PMP are welcome! There are many ways you can help: Report any [
 If you are using PMP for research projects, please acknowledge its use by referencing
 
 ```tex
-@misc{pmp-library,
-title  = {The Polygon Mesh Processing Library},
-author = {Daniel Sieger and Mario Botsch},
-note   = {http://www.pmp-library.org},
-year   = {2019},
+@software{pmp23,
+  author = {Sieger, Daniel and Botsch, Mario},
+  title = {{The Polygon Mesh Processing Library}},
+  year = {2023},
+  month = aug,
+  version = {3.0.0},
+  doi = {10.5281/zenodo.10866532},
+  url = {https://github.com/pmp-library/pmp-library}
 }
 ```
 

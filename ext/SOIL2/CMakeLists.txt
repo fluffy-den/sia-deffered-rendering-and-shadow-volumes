@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 3.13)
 project(SOIL)
 enable_language(C)
 
@@ -9,6 +9,10 @@ else()
   find_package (OpenGL REQUIRED)
   include_directories (${OPENGL_INCLUDE_DIR})
   set(LIBRARIES ${OPENGL_LIBRARIES})
+endif()
+
+if(APPLE)
+  add_definitions(-DGL_SILENCE_DEPRECATION)
 endif()
 
 file (GLOB SOIL_SOURCES src/SOIL2/*.c)

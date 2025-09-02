@@ -4,14 +4,23 @@
 
 #pragma once
 
-#include <vector>
+#include <cassert>
+#include <cstddef>
+#include <compare>
 #include <filesystem>
+#include <iterator>
+#include <ostream>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "pmp/types.h"
 #include "pmp/properties.h"
-#include "pmp/io/io_flags.h"
+#include "pmp/exceptions.h"
 
 namespace pmp {
+
+struct IOFlags;
 
 //! \addtogroup core
 //!@{
@@ -36,13 +45,7 @@ public:
     bool is_valid() const { return idx_ != PMP_MAX_INDEX; }
 
     //! are two handles equal?
-    bool operator==(const Handle& rhs) const { return idx_ == rhs.idx_; }
-
-    //! are two handles different?
-    bool operator!=(const Handle& rhs) const { return idx_ != rhs.idx_; }
-
-    //! compare operator useful for sorting handles
-    bool operator<(const Handle& rhs) const { return idx_ < rhs.idx_; }
+    auto operator<=>(const Handle& rhs) const = default;
 
 private:
     friend class SurfaceMesh;
@@ -189,7 +192,10 @@ public:
     }
 };
 
-//! A halfedge data structure for polygonal meshes.
+//! \brief A class for representing polygon surface meshes.
+//! \details This class implements a half-edge data structure for surface meshes.
+//! See \cite sieger_2011_design for details on the design and implementation.
+//! \note This class only supports 2-manifold surface meshes with boundary.
 class SurfaceMesh
 {
 public:
@@ -218,17 +224,8 @@ public:
         //! get the vertex the iterator refers to
         Vertex operator*() const { return handle_; }
 
-        //! are two iterators equal?
-        bool operator==(const VertexIterator& rhs) const
-        {
-            return (handle_ == rhs.handle_);
-        }
-
-        //! are two iterators different?
-        bool operator!=(const VertexIterator& rhs) const
-        {
-            return !operator==(rhs);
-        }
+        //! Three-way comparison operator.
+        auto operator<=>(const VertexIterator& rhs) const = default;
 
         //! pre-increment iterator
         VertexIterator& operator++()
@@ -298,17 +295,8 @@ public:
         //! get the halfedge the iterator refers to
         Halfedge operator*() const { return handle_; }
 
-        //! are two iterators equal?
-        bool operator==(const HalfedgeIterator& rhs) const
-        {
-            return (handle_ == rhs.handle_);
-        }
-
-        //! are two iterators different?
-        bool operator!=(const HalfedgeIterator& rhs) const
-        {
-            return !operator==(rhs);
-        }
+        //! Three-way comparison operator.
+        auto operator<=>(const HalfedgeIterator& rhs) const = default;
 
         //! pre-increment iterator
         HalfedgeIterator& operator++()
@@ -377,17 +365,8 @@ public:
         //! get the edge the iterator refers to
         Edge operator*() const { return handle_; }
 
-        //! are two iterators equal?
-        bool operator==(const EdgeIterator& rhs) const
-        {
-            return (handle_ == rhs.handle_);
-        }
-
-        //! are two iterators different?
-        bool operator!=(const EdgeIterator& rhs) const
-        {
-            return !operator==(rhs);
-        }
+        //! Three-way comparison operator.
+        auto operator<=>(const EdgeIterator& rhs) const = default;
 
         //! pre-increment iterator
         EdgeIterator& operator++()
@@ -456,17 +435,8 @@ public:
         //! get the face the iterator refers to
         Face operator*() const { return handle_; }
 
-        //! are two iterators equal?
-        bool operator==(const FaceIterator& rhs) const
-        {
-            return (handle_ == rhs.handle_);
-        }
-
-        //! are two iterators different?
-        bool operator!=(const FaceIterator& rhs) const
-        {
-            return !operator==(rhs);
-        }
+        //! Three-way comparison operator
+        auto operator<=>(const FaceIterator& rhs) const = default;
 
         //! pre-increment iterator
         FaceIterator& operator++()
@@ -1288,7 +1258,7 @@ public:
     //! \return whether \p v is a boundary vertex
     bool is_boundary(Vertex v) const
     {
-        Halfedge h(halfedge(v));
+        const Halfedge h(halfedge(v));
         return (!(h.is_valid() && face(h).is_valid()));
     }
 
@@ -1423,7 +1393,7 @@ public:
     bool is_boundary(Face f) const
     {
         Halfedge h = halfedge(f);
-        Halfedge hh = h;
+        const Halfedge hh = h;
         do
         {
             if (is_boundary(opposite_halfedge(h)))
@@ -1625,9 +1595,6 @@ public:
     {
         return fprops_.properties();
     }
-
-    //! prints the names of all properties
-    void property_stats() const;
 
     //!@}
     //! \name Iterators and circulators
@@ -1867,12 +1834,15 @@ public:
     size_t valence(Face f) const;
 
     //! Delete vertex \p v from the mesh.
+    //! \note Only marks the vertex as deleted. Call garbage_collection() to finally remove deleted entities.
     void delete_vertex(Vertex v);
 
     //! Delete edge \p e from the mesh.
+    //! \note Only marks the edge as deleted. Call garbage_collection() to finally remove deleted entities.
     void delete_edge(Edge e);
 
     //! Deletes face \p f from the mesh.
+    //! \note Only marks the face as deleted. Call garbage_collection() to finally remove deleted entities.
     void delete_face(Face f);
 
     //!@}
@@ -1922,7 +1892,7 @@ public:
         hprops_.push_back();
 
         Halfedge h0(static_cast<IndexType>(halfedges_size()) - 2);
-        Halfedge h1(static_cast<IndexType>(halfedges_size()) - 1);
+        const Halfedge h1(static_cast<IndexType>(halfedges_size()) - 1);
 
         return h0;
     }
@@ -1945,8 +1915,8 @@ public:
         hprops_.push_back();
         hprops_.push_back();
 
-        Halfedge h0(static_cast<IndexType>(halfedges_size()) - 2);
-        Halfedge h1(static_cast<IndexType>(halfedges_size()) - 1);
+        const Halfedge h0(static_cast<IndexType>(halfedges_size()) - 2);
+        const Halfedge h1(static_cast<IndexType>(halfedges_size()) - 1);
 
         set_vertex(h0, end);
         set_vertex(h1, start);

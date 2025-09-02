@@ -17,39 +17,39 @@ const Vector<Scalar, 3> barycentric_coordinates(const Vector<Scalar, 3>& p,
 
     Vector<Scalar, 3> vu = v - u, wu = w - u, pu = p - u;
 
-    // find largest absolute coodinate of normal
+    // find largest absolute coordinate of normal
     Scalar nx = vu[1] * wu[2] - vu[2] * wu[1],
            ny = vu[2] * wu[0] - vu[0] * wu[2],
            nz = vu[0] * wu[1] - vu[1] * wu[0], ax = fabs(nx), ay = fabs(ny),
            az = fabs(nz);
 
-    unsigned char maxCoord;
+    unsigned char max_coord;
 
     if (ax > ay)
     {
         if (ax > az)
         {
-            maxCoord = 0;
+            max_coord = 0;
         }
         else
         {
-            maxCoord = 2;
+            max_coord = 2;
         }
     }
     else
     {
         if (ay > az)
         {
-            maxCoord = 1;
+            max_coord = 1;
         }
         else
         {
-            maxCoord = 2;
+            max_coord = 2;
         }
     }
 
     // solve 2D problem
-    switch (maxCoord)
+    switch (max_coord)
     {
         case 0:
         {

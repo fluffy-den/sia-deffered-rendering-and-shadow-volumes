@@ -6,11 +6,11 @@ In this section, we describe how to configure, build, and install PMP in detail.
 
 ## System Requirements
 
-PMP uses [CMake](http://www.cmake.org) as its build configuration system. Version 3.16.3 or greater is required. PMP requires a C++17-compliant compiler. We continuously build and test PMP with the following compilers and operating systems:
+PMP uses [CMake](http://www.cmake.org) as its build configuration system. Version 3.16.3 or greater is required. PMP requires a C++20-compliant compiler. We continuously build and test PMP with the following compilers and operating systems:
 
 | Operating System | Compiler           |
 | ---------------- | ------------------ |
-| Linux            | gcc 11.3.0         |
+| Linux            | gcc 11.4.0         |
 | macOS            | AppleClang 14.0.0  |
 | Windows          | Visual Studio 2022 |
 
@@ -24,9 +24,9 @@ Some parts of PMP depend on the following third-party libraries:
 | --------------------------------------------------- | --------------------------------- | ----------- |
 | [Eigen](http://eigen.tuxfamily.org)                 | C++ linear algebra library        | &ge; 3.4.0  |
 | [OpenGL](http://opengl.org)                         | Open Graphics Library             | &ge; 3.3    |
-| [GLEW](http://glew.sourceforge.net)                 | OpenGL Extension Wrangler Library | &ge; 2.1.0  |
-| [GLFW](http://glfw.org)                             | Graphics Library Framework        | &ge; 3.3.8  |
-| [ImGui](https://github.com/ocornut/imgui)           | Immediate Mode GUI                | &ge; 1.88   |
+| [GLAD](https://github.com/Dav1dde/glad)             | OpenGL loader library             | &ge; 2.0.8  |
+| [GLFW](http://glfw.org)                             | Graphics Library Framework        | &ge; 3.4    |
+| [ImGui](https://github.com/ocornut/imgui)           | Immediate Mode GUI                | &ge; 1.90.4 |
 | [Google Test](https://github.com/google/googletest) | C++ Test Framework                | &ge; 1.13.0 |
 
 By default, we include the corresponding libraries in our repository. Note that OpenGL and related dependencies are optional. They are only needed if you want to use the viewer classes. Google Test is optional as well and only required if you want to run the unit test suite.
@@ -84,7 +84,7 @@ In order to build the full HTML manual and reference documentation call
 make docs
 ```
 
-The resulting HTML documentation can be found in the `docs/html/` sub-directory. Note: this requires [Doxygen](http://www.doxygen.nl/) to be installed. In order to generate proper bibliographical references please install [BibTex](http://www.bibtex.org/) as well.
+The resulting HTML documentation can be found in the `docs/html/` sub-directory. Note: this requires [Doxygen](http://www.doxygen.nl/) to be installed. In order to generate bibliographical references you need to have [BibTex](http://www.bibtex.org/) installed.
 
 ## Installation
 
@@ -124,7 +124,7 @@ This way, you can simply link your own target against PMP
 target_link_libraries(your_target pmp)
 ```
 
-**Note:** The usage described above is currently limited to the @ref core and @ref algorithms modules of PMP. If you want to use the @ref visualization module you need to link your target against `pmp_vis` and its dependencies: `stb_image`, `imgui`, `glfw`, `glew`, as well as your platform OpenGL library.
+**Note:** The usage described above is currently limited to the @ref core and @ref algorithms modules of PMP. If you want to use the @ref visualization module you need to link your target against `pmp_vis` and its dependencies: `stb_image`, `imgui`, `glfw`, as well as your platform OpenGL library.
 
 ## Build Options
 

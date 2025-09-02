@@ -58,6 +58,7 @@ private:
     void collapse_short_edges(const Scalar lmin);
     void flip_edges();
     void relaxation();
+    void remove_caps();
     void fairing();
 
     // return i'th vertex of hole
@@ -71,7 +72,8 @@ private:
     Normal opposite_normal(unsigned int i) const
     {
         assert(i < hole_.size());
-        return face_normal(mesh_, mesh_.face(mesh_.opposite_halfedge(hole_[i])));
+        return face_normal(mesh_,
+                           mesh_.face(mesh_.opposite_halfedge(hole_[i])));
     }
 
     // does interior edge (_a,_b) exist already?
@@ -106,7 +108,7 @@ HoleFilling::HoleFilling(SurfaceMesh& mesh) : mesh_(mesh)
 
 bool HoleFilling::is_interior_edge(Vertex a, Vertex b) const
 {
-    Halfedge h = mesh_.find_halfedge(a, b);
+    const Halfedge h = mesh_.find_halfedge(a, b);
     if (!h.is_valid())
         return false; // edge does not exist
     return (!mesh_.is_boundary(h) &&
@@ -240,11 +242,11 @@ void HoleFilling::triangulate_hole(Halfedge h)
     {
         ivec2 tri = todo.back();
         todo.pop_back();
-        int start = tri[0];
-        int end = tri[1];
+        const int start = tri[0];
+        const int end = tri[1];
         if (end - start < 2)
             continue;
-        int split = index_[start][end];
+        const int split = index_[start][end];
 
         mesh_.add_triangle(hole_vertex(start), hole_vertex(split),
                            hole_vertex(end));
@@ -263,7 +265,6 @@ HoleFilling::Weight HoleFilling::compute_weight(int i, int j, int k) const
     const Vertex a = hole_vertex(i);
     const Vertex b = hole_vertex(j);
     const Vertex c = hole_vertex(k);
-    Vertex d;
 
     // if one of the potential edges already exists, this would result
     // in an invalid triangulation -> prevent by giving infinite weight
@@ -282,11 +283,13 @@ HoleFilling::Weight HoleFilling::compute_weight(int i, int j, int k) const
     Point n2;
 
     // ...neighbor to (i,j)
-    n2 = (i + 1 == j) ? opposite_normal(j) : compute_normal(a, hole_vertex(index_[i][j]), b);
+    n2 = (i + 1 == j) ? opposite_normal(j)
+                      : compute_normal(a, hole_vertex(index_[i][j]), b);
     angle = std::max(angle, compute_angle(n, n2));
 
     // ...neighbor to (j,k)
-    n2 = (j + 1 == k) ? opposite_normal(k) : compute_normal(b, hole_vertex(index_[j][k]), c);
+    n2 = (j + 1 == k) ? opposite_normal(k)
+                      : compute_normal(b, hole_vertex(index_[j][k]), c);
     angle = std::max(angle, compute_angle(n, n2));
 
     // ...neighbor to (k,i) if (k,i)==(n-1, 0)
@@ -301,28 +304,27 @@ HoleFilling::Weight HoleFilling::compute_weight(int i, int j, int k) const
 
 void HoleFilling::refine()
 {
-    const int n = hole_.size();
-    Scalar l, lmin, lmax;
-
     // compute target edge length
-    l = 0.0;
+    const int n = hole_.size();
+    Scalar mean_length(0);
     for (int i = 0; i < n; ++i)
     {
-        l += distance(points_[hole_vertex(i)],
-                      points_[hole_vertex((i + 1) % n)]);
+        mean_length += distance(points_[hole_vertex(i)],
+                                points_[hole_vertex((i + 1) % n)]);
     }
-    l /= (Scalar)n;
-    lmin = 0.7 * l;
-    lmax = 1.5 * l;
+    mean_length /= (Scalar)n;
 
     // do some iterations
+    const auto min_length = Scalar{0.7} * mean_length;
+    const auto max_length = Scalar{1.5} * mean_length;
     for (int iter = 0; iter < 10; ++iter)
     {
-        split_long_edges(lmax);
-        collapse_short_edges(lmin);
+        split_long_edges(max_length);
+        collapse_short_edges(min_length);
         flip_edges();
         relaxation();
     }
+    remove_caps();
     fairing();
 }
 
@@ -339,8 +341,8 @@ void HoleFilling::split_long_edges(const Scalar lmax)
         {
             if (!elocked_[e])
             {
-                Halfedge h10 = mesh_.halfedge(e, 0);
-                Halfedge h01 = mesh_.halfedge(e, 1);
+                const Halfedge h10 = mesh_.halfedge(e, 0);
+                const Halfedge h01 = mesh_.halfedge(e, 1);
                 const Point& p0 = points_[mesh_.to_vertex(h10)];
                 const Point& p1 = points_[mesh_.to_vertex(h01)];
 
@@ -367,10 +369,10 @@ void HoleFilling::collapse_short_edges(const Scalar _lmin)
         {
             if (!mesh_.is_deleted(e) && !elocked_[e])
             {
-                Halfedge h10 = mesh_.halfedge(e, 0);
-                Halfedge h01 = mesh_.halfedge(e, 1);
-                Vertex v0 = mesh_.to_vertex(h10);
-                Vertex v1 = mesh_.to_vertex(h01);
+                const Halfedge h10 = mesh_.halfedge(e, 0);
+                const Halfedge h01 = mesh_.halfedge(e, 1);
+                const Vertex v0 = mesh_.to_vertex(h10);
+                const Vertex v1 = mesh_.to_vertex(h01);
                 const Point& p0 = points_[v0];
                 const Point& p1 = points_[v1];
 
@@ -485,7 +487,7 @@ void HoleFilling::relaxation()
     std::vector<Triplet> triplets;
     for (int i = 0; i < n; ++i)
     {
-        Vertex v = vertices[i];
+        const Vertex v = vertices[i];
         Point b(0, 0, 0);
         Scalar c(0);
 
@@ -510,7 +512,7 @@ void HoleFilling::relaxation()
     using SparseMatrix = Eigen::SparseMatrix<double>;
     SparseMatrix A(n, n);
     A.setFromTriplets(triplets.begin(), triplets.end());
-    Eigen::SimplicialLDLT<SparseMatrix> solver(A);
+    const Eigen::SimplicialLDLT<SparseMatrix> solver(A);
     Eigen::MatrixXd X = solver.solve(B);
 
     if (solver.info() != Eigen::Success)
@@ -531,6 +533,51 @@ void HoleFilling::relaxation()
     mesh_.remove_vertex_property(idx);
 }
 
+void HoleFilling::remove_caps()
+{
+    Halfedge h;
+    Vertex v, vb, vd;
+    Scalar a0, a1, amin;
+    const Scalar aa(::cos(170.0 * std::numbers::pi / 180.0));
+    Point a, b, c, d;
+
+    for (auto e : mesh_.edges())
+    {
+        if (mesh_.is_flip_ok(e))
+        {
+            h = mesh_.halfedge(e, 0);
+            a = points_[mesh_.to_vertex(h)];
+            h = mesh_.next_halfedge(h);
+            b = points_[vb = mesh_.to_vertex(h)];
+            h = mesh_.halfedge(e, 1);
+            c = points_[mesh_.to_vertex(h)];
+            h = mesh_.next_halfedge(h);
+            d = points_[vd = mesh_.to_vertex(h)];
+
+            a0 = dot(normalize(a - b), normalize(c - b));
+            a1 = dot(normalize(a - d), normalize(c - d));
+
+            if (a0 < a1)
+            {
+                amin = a0;
+                v = vb;
+            }
+            else
+            {
+                amin = a1;
+                v = vd;
+            }
+
+            // is it a cap?
+            if (amin < aa)
+            {
+                // flip
+                mesh_.flip(e);
+            }
+        }
+    }
+}
+
 void HoleFilling::fairing()
 {
     // did the refinement insert new vertices?
@@ -543,6 +590,7 @@ void HoleFilling::fairing()
         return;
 
     // convert non-locked into selection
+    bool add_vsel = !mesh_.has_vertex_property("v:selected");
     auto vsel = mesh_.vertex_property<bool>("v:selected");
     for (auto v : mesh_.vertices())
         vsel[v] = !vlocked_[v];
@@ -555,18 +603,20 @@ void HoleFilling::fairing()
     catch (SolverException& e)
     {
         // clean up
-        mesh_.remove_vertex_property(vsel);
+        if (add_vsel)
+            mesh_.remove_vertex_property(vsel);
         throw e;
     }
 
     // clean up
-    mesh_.remove_vertex_property(vsel);
+    if (add_vsel)
+        mesh_.remove_vertex_property(vsel);
 }
+
 } // namespace
 
 void fill_hole(SurfaceMesh& mesh, Halfedge h)
 {
     HoleFilling(mesh).fill_hole(h);
 }
-
 } // namespace pmp

@@ -23,7 +23,7 @@ void Shader::cleanup()
         pid_ = 0;
     }
 
-    for (GLint id : shaders_)
+    for (const GLint id : shaders_)
     {
         glDeleteShader(id);
     }
@@ -43,12 +43,10 @@ void Shader::source(const char* vshader, const char* fshader)
     // vertex shader
     id = compile(vshader, GL_VERTEX_SHADER);
     glAttachShader(pid_, id);
-    shaders_.push_back(id);
 
     // fragment shader
     id = compile(fshader, GL_FRAGMENT_SHADER);
     glAttachShader(pid_, id);
-    shaders_.push_back(id);
 
     // link program
     link();
@@ -68,19 +66,16 @@ void Shader::load(const char* vfile, const char* ffile, const char* gfile,
     // vertex shader
     id = load_and_compile(vfile, GL_VERTEX_SHADER);
     glAttachShader(pid_, id);
-    shaders_.push_back(id);
 
     // fragment shader
     id = load_and_compile(ffile, GL_FRAGMENT_SHADER);
     glAttachShader(pid_, id);
-    shaders_.push_back(id);
 
     // tessellation control shader
     if (tcfile)
     {
         id = load_and_compile(tcfile, GL_TESS_CONTROL_SHADER);
         glAttachShader(pid_, id);
-        shaders_.push_back(id);
     }
 
     // tessellation evaluation shader
@@ -88,7 +83,6 @@ void Shader::load(const char* vfile, const char* ffile, const char* gfile,
     {
         id = load_and_compile(tefile, GL_TESS_EVALUATION_SHADER);
         glAttachShader(pid_, id);
-        shaders_.push_back(id);
     }
 
     // geometry shader
@@ -96,7 +90,6 @@ void Shader::load(const char* vfile, const char* ffile, const char* gfile,
     {
         id = load_and_compile(gfile, GL_GEOMETRY_SHADER);
         glAttachShader(pid_, id);
-        shaders_.push_back(id);
     }
 
     // link program
@@ -110,8 +103,11 @@ void Shader::link()
     glGetProgramiv(pid_, GL_LINK_STATUS, &status);
     if (status == GL_FALSE)
     {
-        auto info = get_info_log();
-        auto what = "Shader: Cannot link program:" + info;
+        GLint length;
+        glGetProgramiv(pid_, GL_INFO_LOG_LENGTH, &length);
+        auto info = std::vector<GLchar>(length + 1);
+        glGetProgramInfoLog(pid_, length, nullptr, info.data());
+        auto what = "Shader: Cannot link program:" + std::string(info.data());
         cleanup();
         throw GLException(what);
     }
@@ -137,13 +133,14 @@ void Shader::load(const char* filename, std::string& source)
 GLint Shader::compile(const char* source, GLenum type)
 {
     // create shader
-    GLint id = glCreateShader(type);
+    const GLint id = glCreateShader(type);
     if (!id)
     {
         auto what = "Shader: Cannot create shader object.\n";
         cleanup();
         throw GLException(what);
     }
+    shaders_.push_back(id);
 
     // compile vertex shader
     glShaderSource(id, 1, &source, nullptr);
@@ -154,8 +151,11 @@ GLint Shader::compile(const char* source, GLenum type)
     glGetShaderiv(id, GL_COMPILE_STATUS, &status);
     if (status == GL_FALSE)
     {
-        auto info = get_info_log();
-        auto what = "Shader: Cannot compile shader:" + info;
+        GLint length;
+        glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length);
+        auto info = std::vector<GLchar>(length + 1);
+        glGetShaderInfoLog(id, length, nullptr, info.data());
+        auto what = "Shader: Cannot compile shader:" + std::string(info.data());
         cleanup();
         throw GLException(what);
     }
@@ -193,7 +193,7 @@ void Shader::set_uniform(const char* name, float value)
 {
     if (!pid_)
         return;
-    int location = glGetUniformLocation(pid_, name);
+    const int location = glGetUniformLocation(pid_, name);
     if (location == -1)
     {
         std::cerr << "Invalid uniform location for: " << name << std::endl;
@@ -206,7 +206,7 @@ void Shader::set_uniform(const char* name, int value)
 {
     if (!pid_)
         return;
-    int location = glGetUniformLocation(pid_, name);
+    const int location = glGetUniformLocation(pid_, name);
     if (location == -1)
     {
         std::cerr << "Invalid uniform location for: " << name << std::endl;
@@ -219,7 +219,7 @@ void Shader::set_uniform(const char* name, const vec3& vec)
 {
     if (!pid_)
         return;
-    int location = glGetUniformLocation(pid_, name);
+    const int location = glGetUniformLocation(pid_, name);
     if (location == -1)
     {
         std::cerr << "Invalid uniform location for: " << name << std::endl;
@@ -232,7 +232,7 @@ void Shader::set_uniform(const char* name, const vec4& vec)
 {
     if (!pid_)
         return;
-    int location = glGetUniformLocation(pid_, name);
+    const int location = glGetUniformLocation(pid_, name);
     if (location == -1)
     {
         std::cerr << "Invalid uniform location for: " << name << std::endl;
@@ -245,7 +245,7 @@ void Shader::set_uniform(const char* name, const mat3& mat)
 {
     if (!pid_)
         return;
-    int location = glGetUniformLocation(pid_, name);
+    const int location = glGetUniformLocation(pid_, name);
     if (location == -1)
     {
         std::cerr << "Invalid uniform location for: " << name << std::endl;
@@ -258,22 +258,13 @@ void Shader::set_uniform(const char* name, const mat4& mat)
 {
     if (!pid_)
         return;
-    int location = glGetUniformLocation(pid_, name);
+    const int location = glGetUniformLocation(pid_, name);
     if (location == -1)
     {
         std::cerr << "Invalid uniform location for: " << name << std::endl;
         return;
     }
     glUniformMatrix4fv(location, 1, false, mat.data());
-}
-
-std::string Shader::get_info_log() const
-{
-    GLint length;
-    glGetProgramiv(pid_, GL_INFO_LOG_LENGTH, &length);
-    auto info = std::vector<GLchar>(length + 1);
-    glGetProgramInfoLog(pid_, length, nullptr, info.data());
-    return {info.data()};
 }
 
 } // namespace pmp

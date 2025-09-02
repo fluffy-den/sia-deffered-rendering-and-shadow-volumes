@@ -10,6 +10,34 @@ This project aims to adhere to [Semantic Versioning](https://semver.org/spec/v2.
 
 ### Added
 
+- Add `linear_subdivision()` function performing linear quad/tri subdivision.
+- Add `BoundaryHandling` option to subdivision functions (Loop, Catmull-Clark, Quad/Tri).
+- Add `connected_components` function.
+
+### Changed
+
+- Upgrade C++ standard to C++20.
+- Remove `SurfaceMesh::property_stats()`.
+- Throw exception when trying to add a property with the same name as an existing one.
+- Rename `Curvature` scoped enum constants for consistency.
+- Rename `glCheckError` to `check_gl_errors`.
+- Make `is_constrained()` predicate in `cholesky_solve()` a const reference.
+- Make `is_selection()` predicate in `selector_matrix()` a const reference.
+- Switch from GLEW to GLAD
+- Update ImGui to version 1.90.4
+- Update GLFW to version 3.4
+
+### Fixed
+
+- Fix binary OFF files to use big endian encoding by default (#198).
+- Make OFF file parsing robust to comments and whitespace. Thanks to François Revol (#197).
+- Fix error reporting when shader compilation fails, thanks to Stephan Wenninger (#183).
+- Fix GLFW include path for ImGui when using PMP as a sub-project (use relative path).
+
+## [3.0.0] 2023-08-24
+
+### Added
+
 - Add `mesh_to_matrices()` and `matrices_to_mesh()` functions to convert to and from Eigen matrices.
 - Add support to write binary STL files.
 - Added `geodesics_heat()` for computing geodesics (based on the heat method) on general polygon meshes.
