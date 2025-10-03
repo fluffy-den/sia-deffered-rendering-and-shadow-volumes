@@ -37,6 +37,10 @@ add_definitions(-DDATA_DIR="${PROJECT_SOURCE_DIR}/data")
 
 add_executable(sia_glrenderer ${SOURCES} ${HEADERS} ${IMGUI_SOURCE_FILES})
 
+target_compile_options(pmp PRIVATE
+    $<$<CXX_COMPILER_ID:GNU>:-Wno-stringop-overflow>
+)
+
 target_link_libraries(sia_glrenderer PRIVATE glfw pmp glbinding::glbinding
                                              glbinding::glbinding-aux SOIL)
 
