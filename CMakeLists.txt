@@ -1,11 +1,9 @@
 cmake_policy(SET CMP0048 NEW)
 
+cmake_minimum_required(VERSION 3.5.0)
 project(sia_glrenderer)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-cmake_minimum_required(VERSION 3.5.0)
-
 add_subdirectory(ext ext_build)
 
 include_directories(

@@ -312,15 +312,9 @@ void Viewer::updateScene() {
     for (int i = 0; i < _pointLights.size(); ++i) {
       // update light position
       Vector3f lightPos = _pointLights[i]->transformationMatrix().translation();
-      Vector3f lightDir = (lightPos - _cam.sceneCenter()) / _cam.sceneRadius();
-      float radius =
-          std::sqrt(lightDir.x() * lightDir.x() + lightDir.z() * lightDir.z());
-      lightDir.x() = radius * cos(_lightAngle + i * M_PI / 2.f);
-      lightDir.z() = radius * sin(_lightAngle + i * M_PI / 2.f);
-      _pointLights[i]->transformationMatrix().translation() =
-          _cam.sceneCenter() + _cam.sceneRadius() * lightDir;
+      AngleAxisf rotation = AngleAxisf(_lightAngle, Vector3f::UnitY());
+      _pointLights[i]->transformationMatrix().translation() = rotation * lightPos;
     }
-    _lightAngle += M_PI / 100.f;
     _lastTime = glfwGetTime();
   }
 
