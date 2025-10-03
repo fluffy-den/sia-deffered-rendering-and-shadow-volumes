@@ -2,3 +2,12 @@
 build*/*
 imgui.ini
 compile_commands.json
+.cache/clangd/index
+CMakeFiles
+CMakeFiles
+ext_build
+CMakeCache.txt
+CPackSourceConfig.cmake
+Makefile
+sia_glrenderer
+cmake_install.cmake

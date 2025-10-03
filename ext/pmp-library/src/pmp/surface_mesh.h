@@ -32,8 +32,19 @@ struct IOFlags;
 class Handle
 {
 public:
+    // disable warning about array bounds (GCC15+ only)
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wall"
+#pragma GCC diagnostic ignored "-Wextra"
+#pragma GCC diagnostic ignored "-Wpedantic"
+#pragma GCC diagnostic ignored "-Warray-bounds"
+#pragma GCC diagnostic ignored "-Wshadow"
+
     //! default constructor with invalid index
     explicit Handle(IndexType idx = PMP_MAX_INDEX) : idx_(idx) {}
+
+#pragma GCC diagnostic pop
 
     //! Get the underlying index of this handle
     IndexType idx() const { return idx_; }
