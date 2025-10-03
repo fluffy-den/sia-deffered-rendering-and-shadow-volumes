@@ -6,8 +6,8 @@
 #include <iostream>
 #include <sstream>
 
-#include <pmp/io/io.h>
 #include <pmp/algorithms/normals.h>
+#include <pmp/io/io.h>
 
 using namespace std;
 using namespace Eigen;
@@ -140,7 +140,7 @@ void Mesh::createSphere(float radius, int nU, int nV) {
 
       normals.col(idx) << sin(theta) * cos(phi), sin(theta) * sin(phi),
           cos(theta);
-      if(normals.col(idx).squaredNorm() > 0.f)
+      if (normals.col(idx).squaredNorm() > 0.f)
         normals.col(idx).normalize();
 
       Vector3f position = normals.col(idx) * radius;
@@ -344,6 +344,6 @@ void Mesh::addQuad(const Vector4f &p0, const Vector4f &p1, const Vector4f &p2,
 }
 
 Mesh *Mesh::computeShadowVolume(const Vector3f &lightPos, bool interpolated) {
-  // TODO
+  (void)interpolated;
   return nullptr;
 }

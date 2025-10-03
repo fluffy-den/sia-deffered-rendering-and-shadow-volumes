@@ -2,6 +2,7 @@
 #include "camera.h"
 
 #include <SOIL2.h>
+#include <cstdint>
 #include <imgui.h>
 
 using namespace Eigen;
@@ -57,13 +58,30 @@ void Viewer::init(int w, int h) {
   Mesh *light = new Mesh();
   light->createSphere(0.025f);
   light->init();
-  light->transformationMatrix() =
-      Translation3f(_cam.sceneCenter() +
-                    _cam.sceneRadius() *
-                        Vector3f(Eigen::internal::random<float>(),
-                                  Eigen::internal::random<float>(0.1f, 0.5f),
-                                  Eigen::internal::random<float>()));
-  _pointLights.push_back(light);
+  light->transformationMatrix() = Translation3f(
+      _cam.sceneCenter() +
+      _cam.sceneRadius() * Vector3f(Eigen::internal::random<float>(),
+                                    Eigen::internal::random<float>(0.1f, 0.5f),
+                                    Eigen::internal::random<float>()));
+
+  _pointLights.emplace_back(light);
+  for (uint32_t i = 0; i < 3; ++i) {
+    Mesh *lighti = new Mesh();
+    lighti->createSphere(Eigen::internal::random<float>(0.025f, 0.025f));
+    lighti->init();
+    lighti->transformationMatrix() =
+        Translation3f(_cam.sceneCenter() +
+                      _cam.sceneRadius() *
+                          Vector3f(Eigen::internal::random<float>(0.1f, 1.f),
+                                   Eigen::internal::random<float>(0.1f, 4.f),
+                                   Eigen::internal::random<float>(0.1f, 4.f)));
+
+    _lightColors.emplace_back(
+        Vector3f(Eigen::internal::random<float>(0.25f, 1.0f),
+                 Eigen::internal::random<float>(0.25f, 1.0f),
+                 Eigen::internal::random<float>(0.25f, 1.0f)));
+    _pointLights.emplace_back(lighti);
+  }
 
   _lastTime = glfwGetTime();
 
@@ -78,6 +96,12 @@ void Viewer::init(int w, int h) {
   _cam.setNearFarOffsets(-_cam.sceneRadius() * 100.f,
                          _cam.sceneRadius() * 100.f);
   _cam.setScreenViewport(AlignedBox2f(Vector2f(0.0, 0.0), Vector2f(w, h)));
+
+  _deferredFbo.init(w, h);
+
+  _deferredQuad = new Mesh();
+  _deferredQuad->createGrid(2, 2);
+  _deferredQuad->init();
 }
 
 void Viewer::reshape(int w, int h) {
@@ -88,36 +112,78 @@ void Viewer::reshape(int w, int h) {
 }
 
 void Viewer::drawForward() {
-  glDepthMask(GL_TRUE);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
   _blinnPrg.activate();
   glUniformMatrix4fv(_blinnPrg.getUniformLocation("projection_matrix"), 1,
-                      GL_FALSE, _cam.computeProjectionMatrix().data());
+                     GL_FALSE, _cam.computeProjectionMatrix().data());
   glUniformMatrix4fv(_blinnPrg.getUniformLocation("view_matrix"), 1, GL_FALSE,
-                      _cam.computeViewMatrix().data());
-  Vector4f lightPos;
-  lightPos << _pointLights[0]->transformationMatrix().translation(), 1.f;
-  glUniform4fv(_blinnPrg.getUniformLocation("light_pos"), 1,
-                (_cam.computeViewMatrix() * lightPos).eval().data());
-  glUniform3fv(_blinnPrg.getUniformLocation("light_col"), 1,
-                _lightColors[0].data());
+                     _cam.computeViewMatrix().data());
 
-  for (size_t i = 0; i < _shapes.size(); ++i) {
-    glUniformMatrix4fv(_blinnPrg.getUniformLocation("model_matrix"), 1,
-                        GL_FALSE, _shapes[i]->transformationMatrix().data());
-    Matrix3f normal_matrix =
-        (_cam.computeViewMatrix() * _shapes[i]->transformationMatrix())
-            .linear()
-            .inverse()
-            .transpose();
-    glUniformMatrix3fv(_blinnPrg.getUniformLocation("normal_matrix"), 1,
-                        GL_FALSE, normal_matrix.data());
-    glUniform1f(_blinnPrg.getUniformLocation("specular_coef"),
-                _specularCoef[i]);
+  // Draw of the first light
+  if (_pointLights.size() > 0) {
+    glUniform1f(_blinnPrg.getUniformLocation("is_first"), 1.f);
 
-    _shapes[i]->draw(_blinnPrg);
+    Vector4f lightPos;
+    lightPos << _pointLights[0]->transformationMatrix().translation(), 1.f;
+    glUniform4fv(_blinnPrg.getUniformLocation("light_pos"), 1,
+                 (_cam.computeViewMatrix() * lightPos).eval().data());
+    glUniform3fv(_blinnPrg.getUniformLocation("light_col"), 1,
+                 _lightColors[0].data());
+
+    for (size_t i = 0; i < _shapes.size(); ++i) {
+      glUniformMatrix4fv(_blinnPrg.getUniformLocation("model_matrix"), 1,
+                         GL_FALSE, _shapes[i]->transformationMatrix().data());
+      Matrix3f normal_matrix =
+          (_cam.computeViewMatrix() * _shapes[i]->transformationMatrix())
+              .linear()
+              .inverse()
+              .transpose();
+      glUniformMatrix3fv(_blinnPrg.getUniformLocation("normal_matrix"), 1,
+                         GL_FALSE, normal_matrix.data());
+      glUniform1f(_blinnPrg.getUniformLocation("specular_coef"),
+                  _specularCoef[i]);
+
+      _shapes[i]->draw(_blinnPrg);
+    }
   }
+
+  if (_pointLights.size() > 1) {
+    glEnable(GL_BLEND);
+    glDepthFunc(GL_EQUAL);
+    glBlendFunc(GL_ONE, GL_ONE);
+    glDepthMask(GL_FALSE);
+
+    glUniform1f(_blinnPrg.getUniformLocation("is_first"), 0.f);
+
+    for (size_t l = 1; l < _pointLights.size(); ++l) {
+      Vector4f lightPos;
+      lightPos << _pointLights[l]->transformationMatrix().translation(), 1.f;
+      glUniform4fv(_blinnPrg.getUniformLocation("light_pos"), 1,
+                   (_cam.computeViewMatrix() * lightPos).eval().data());
+      glUniform3fv(_blinnPrg.getUniformLocation("light_col"), 1,
+                   _lightColors[l].data());
+
+      for (size_t i = 0; i < _shapes.size(); ++i) {
+        glUniformMatrix4fv(_blinnPrg.getUniformLocation("model_matrix"), 1,
+                           GL_FALSE, _shapes[i]->transformationMatrix().data());
+        Matrix3f normal_matrix =
+            (_cam.computeViewMatrix() * _shapes[i]->transformationMatrix())
+                .linear()
+                .inverse()
+                .transpose();
+        glUniformMatrix3fv(_blinnPrg.getUniformLocation("normal_matrix"), 1,
+                           GL_FALSE, normal_matrix.data());
+        glUniform1f(_blinnPrg.getUniformLocation("specular_coef"),
+                    _specularCoef[i]);
+
+        _shapes[i]->draw(_blinnPrg);
+      }
+    }
+  }
+  glDisable(GL_BLEND);
+  glDepthMask(GL_TRUE);
+  glDepthFunc(GL_LESS);
 
   _blinnPrg.deactivate();
 
@@ -125,9 +191,100 @@ void Viewer::drawForward() {
 }
 
 void Viewer::drawDeferred() {
+  // 1. GBuffer
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-  // TODO
+  _deferredFbo.bind();
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+  _gbufferPrg.activate();
+
+  glUniformMatrix4fv(_gbufferPrg.getUniformLocation("projection_matrix"), 1,
+                     GL_FALSE, _cam.computeProjectionMatrix().data());
+  glUniformMatrix4fv(_gbufferPrg.getUniformLocation("view_matrix"), 1, GL_FALSE,
+                     _cam.computeViewMatrix().data());
+
+  glEnable(GL_DEPTH_TEST);
+  for (size_t i = 0; i < _shapes.size(); ++i) {
+    glUniformMatrix4fv(_gbufferPrg.getUniformLocation("model_matrix"), 1,
+                       GL_FALSE, _shapes[i]->transformationMatrix().data());
+    Matrix3f normal_matrix =
+        (_cam.computeViewMatrix() * _shapes[i]->transformationMatrix())
+            .linear()
+            .inverse()
+            .transpose();
+    glUniformMatrix3fv(_gbufferPrg.getUniformLocation("normal_matrix"), 1,
+                       GL_FALSE, normal_matrix.data());
+    glUniform1f(_gbufferPrg.getUniformLocation("specular_coef"),
+                _specularCoef[i]);
+
+    _shapes[i]->draw(_gbufferPrg);
+  }
+
+  _gbufferPrg.deactivate();
+
+  _deferredFbo.unbind();
+
+  // 2. Deffered
+  _deferredPrg.activate();
+
+  Matrix4f inverse_projection = _cam.computeProjectionMatrix().inverse();
+  glUniformMatrix4fv(_deferredPrg.getUniformLocation("inv_projection_matrix"),
+                     1, GL_FALSE, inverse_projection.data());
+
+  glUniform2f(_deferredPrg.getUniformLocation("resolution"),
+              static_cast<float>(_winWidth), static_cast<float>(_winHeight));
+
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, _deferredFbo.textureId(0));
+  glUniform1i(_deferredPrg.getUniformLocation("color_sampler"), 0);
+  glActiveTexture(GL_TEXTURE1);
+  glBindTexture(GL_TEXTURE_2D, _deferredFbo.textureId(1));
+  glUniform1i(_deferredPrg.getUniformLocation("normal_sampler"), 1);
+
+  glDisable(GL_DEPTH_TEST);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_ONE, GL_ONE);
+
+  // First Light
+  if (_pointLights.size() > 0) {
+    glUniform1f(_deferredPrg.getUniformLocation("is_first"), 1.f);
+
+    Vector4f lightPos;
+    lightPos << _pointLights[0]->transformationMatrix().translation(), 1.f;
+    glUniform4fv(_deferredPrg.getUniformLocation("light_pos"), 1,
+                 (_cam.computeViewMatrix() * lightPos).eval().data());
+    glUniform3fv(_deferredPrg.getUniformLocation("light_col"), 1,
+                 _lightColors[0].data());
+
+    _deferredQuad->draw(_deferredPrg);
+  }
+
+  // Other Lights
+  if (_pointLights.size() > 1) {
+    glUniform1f(_deferredPrg.getUniformLocation("is_first"), 0.f);
+
+    for (size_t l = 1; l < _pointLights.size(); ++l) {
+      Vector4f lightPos;
+      lightPos << _pointLights[l]->transformationMatrix().translation(), 1.f;
+      glUniform4fv(_deferredPrg.getUniformLocation("light_pos"), 1,
+                   (_cam.computeViewMatrix() * lightPos).eval().data());
+      glUniform3fv(_deferredPrg.getUniformLocation("light_col"), 1,
+                   _lightColors[l].data());
+
+      _deferredQuad->draw(_deferredPrg);
+    }
+  }
+
+  glDisable(GL_BLEND);
+  glEnable(GL_DEPTH_TEST);
+
+  _deferredPrg.deactivate();
+
+  glBindFramebuffer(GL_READ_FRAMEBUFFER, _deferredFbo.id());
+  glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+  glBlitFramebuffer(0, 0, _winWidth, _winHeight, 0, 0, _winWidth, _winHeight,
+                    GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 
   drawLights();
 }
@@ -139,7 +296,7 @@ void Viewer::drawLights() {
   glUniformMatrix4fv(_simplePrg.getUniformLocation("view_matrix"), 1, GL_FALSE,
                      _cam.computeViewMatrix().data());
   for (int i = 0; i < _pointLights.size(); ++i) {
-    Affine3f modelMatrix = _pointLights[i]->transformationMatrix();  
+    Affine3f modelMatrix = _pointLights[i]->transformationMatrix();
     glUniformMatrix4fv(_simplePrg.getUniformLocation("model_matrix"), 1,
                        GL_FALSE, modelMatrix.data());
     glUniform3fv(_simplePrg.getUniformLocation("light_col"), 1,
@@ -179,6 +336,10 @@ void Viewer::loadProgram() {
                           DATA_DIR "/shaders/blinn.frag");
   _simplePrg.loadFromFiles(DATA_DIR "/shaders/simple.vert",
                            DATA_DIR "/shaders/simple.frag");
+  _gbufferPrg.loadFromFiles(DATA_DIR "/shaders/gbuffer.vert",
+                            DATA_DIR "/shaders/gbuffer.frag");
+  _deferredPrg.loadFromFiles(DATA_DIR "/shaders/deferred.vert",
+                             DATA_DIR "/shaders/deferred.frag");
 }
 
 void Viewer::updateGUI() {

@@ -37,7 +37,9 @@ private:
   int _winWidth, _winHeight;
 
   Camera _cam;
-  Shader _blinnPrg, _simplePrg;
+  Shader _blinnPrg, _simplePrg, _gbufferPrg, _deferredPrg;
+  FBO _deferredFbo;
+  Mesh *_deferredQuad;
 
   // some geometry to render
   std::vector<Mesh *> _shapes;
