@@ -1,0 +1,27 @@
+img-comparison-slider {
+  visibility: hidden;
+}
+
+img-comparison-slider [slot='second'] {
+  display: none;
+}
+
+img-comparison-slider.rendered {
+  visibility: inherit;
+}
+
+img-comparison-slider.rendered [slot='second'] {
+  display: unset;
+}
+
+figure {
+  text-align:center; 
+  width:100%;
+}
+
+img {
+  margin-bottom: 2px;
+  padding: 5px;
+  border: 1px solid #dedede;
+  border-radius: 5px;
+}

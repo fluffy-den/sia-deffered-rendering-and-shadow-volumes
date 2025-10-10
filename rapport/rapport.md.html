@@ -1,0 +1,123 @@
+<meta charset="utf-8">
+<link rel="stylesheet" href="resources/styles.css" />
+
+<style>
+  body { font-family: "Segoe UI", Roboto, sans-serif; line-height: 1.6; color: #222; }
+  h1, h2, h3 { text-align: center; margin-top: 2em; }
+  figure { text-align: center; margin: 2em 0; }
+  figcaption { font-style: italic; color: #666; margin-top: 0.5em; }
+  p, ul { text-align: justify; margin: 0 auto; max-width: 850px; }
+  ul { list-style: disc; padding-left: 3em; }
+  code { background-color: #f5f5f5; padding: 2px 5px; border-radius: 4px; }
+  a { color: #005bbb; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+</style>
+
+<h1><strong>SIA TD1 — Louis-Quentin Noé</strong></h1>
+
+<p style="text-align:center;">
+  <b>GitLab :</b><br />
+  <a href="https://gitlab.emi.u-bordeaux.fr/lnoe/sia-gl-renderer/-/tree/TD1?ref_type=tags">
+    https://gitlab.emi.u-bordeaux.fr/lnoe/sia-gl-renderer/-/tree/TD1?ref_type=tags
+  </a>
+</p>
+
+<hr style="width:50%;margin:2em auto;border:1px solid #ddd;" />
+
+<h2>1. Deferred Shading</h2>
+
+<h3>1.1 Remplissage du G-buffer</h3>
+
+<figure>
+  <img src="images/color.png" style="max-width:32%" />
+  <img src="images/color_sans_a.png" style="max-width:32%" />
+  <img src="images/depth.png" style="max-width:32%" />
+  <figcaption>
+    <b>G-buffer</b> — Couleur (+Spec.a), couleur sans alpha, et profondeur tone-mappée.
+  </figcaption>
+</figure>
+
+<p>
+Le G-buffer est correctement rempli avec les informations de couleur, de composante spéculaire et de profondeur.
+Chaque canal permet de décorréler le rendu géométrique du coût en éclairage dans la passe différée.
+</p>
+
+<h3>1.3 Forward vs Deferred</h3>
+
+<p>
+Lorsque la scène devient complexe (géométrie lourde, nombreuses lumières), le <b>Deferred Rendering</b> devient plus efficace,
+car le coût de rendu n’est plus proportionnel au nombre de lumières.  
+<br /><br />
+À l’inverse, le <b>Forward Rendering</b> effectue un passage complet par lumière,
+ce qui fait croître le coût de manière linéaire avec leur nombre.
+</p>
+
+<hr style="width:50%;margin:2em auto;border:1px solid #ddd;" />
+
+<h2>2. Shadow Volumes</h2>
+
+<h3>2.1 Construction des volumes</h3>
+
+<p>
+La construction des volumes d’ombre a présenté deux difficultés principales :
+</p>
+
+<ul>
+  <li><b>Normales inversées :</b> détectées via un shader de visualisation des normales, puis corrigées.</li>
+  <li><b>Trous d’extrusion :</b> dus à une extrusion naïve et à des incohérences d’ordre des arêtes. Résolu en reconstruisant des quads cohérents et orientés de façon uniforme.</li>
+</ul>
+
+<p>
+Après un long débogage, les volumes générés sont devenus géométriquement corrects et sans discontinuités visibles.
+</p>
+
+<figure>
+  <img src="images/volume_meshes_wrong_normals.png" style="max-width:32%" />
+  <img src="images/volume_meshes_gap_problem.png" style="max-width:32%" />
+  <img src="images/volume_meshes_gap_problem_2.png" style="max-width:32%" />
+  <figcaption><b>Débogage</b> — Normales inversées et trous d’extrusion visibles.</figcaption>
+</figure>
+
+<figure>
+  <img src="images/corrected_volume_meshes_no_gap.png" style="max-width:60%" />
+  <figcaption><b>Résultat final</b> — Volumes corrigés, orientation et jonctions cohérentes.</figcaption>
+</figure>
+
+<h3>2.2 Comptage Z-fail au stencil</h3>
+
+<figure>
+  <img src="images/many_tinky_many_lights_forward.png" style="max-width:49%" />
+  <img src="images/many_tinky_many_lights_deffered.png" style="max-width:49%" />
+  <figcaption><b>Forward vs Deferred</b> — Même scène, nombreuses lumières (Z-fail).</figcaption>
+</figure>
+
+<figure>
+  <img src="images/simple_shadows_forward.png" style="max-width:60%" />
+  <figcaption><b>Ombres portées</b> — Rendu forward, méthode Z-pass.</figcaption>
+</figure>
+
+<h3>2.3 Animation et optimisation</h3>
+
+<p>
+Pour obtenir des ombres dynamiques, il est nécessaire de recalculer les volumes dès que la lumière ou l’objet se déplace.  
+Une optimisation possible consiste à :
+</p>
+
+<ul>
+  <li>Recalculer uniquement si l’objet bouge.</li>
+  <li>Appliquer une simple transformation si seule la lumière change (même <code>model_matrix</code>).</li>
+</ul>
+
+<p>
+Cependant, la construction actuelle est coûteuse : chaque frame, toutes les arêtes sont parcourues et une <code>hashmap</code> est reconstruite pour combler les jonctions.  
+Cette étape devrait être optimisée (pré-calculs, cache topologique, etc.).
+</p>
+
+<p>
+J’ai pu réaliser le <b>bonus</b> (ombres dynamiques), mais le <b>Z-fail</b> reste imparfait :  
+à certains angles de caméra, on distingue l’extrusion sur le plan <code>Z-far</code> et des artefacts apparaissent.  
+Une piste serait d’ajouter un plan derrière le volume (au <code>Z-far</code>) pour forcer le stencil à 0 derrière le shadow volume
+— ou devant, selon la méthode de comptage.
+</p>
+
+<hr style="width:50%;margin:2em auto;border:1px solid #ddd;" />
