@@ -343,7 +343,118 @@ void Mesh::addQuad(const Vector4f &p0, const Vector4f &p1, const Vector4f &p2,
   _indices.push_back(v2.idx());
 }
 
+[[nodiscard]] static Vector3f _get_face_normal(const Mesh &mesh,
+                                               const Face &f) {
+  auto fnormals = mesh.get_face_property<Normal>("f:normal");
+  return Vector3f(fnormals[f]).normalized();
+}
+
+[[nodiscard]] static Vector3f _get_face_center(const Mesh &mesh,
+                                               const Face &f) {
+  auto vpoints = mesh.get_vertex_property<Point>("v:point");
+  Vector3f center = Vector3f::Zero();
+  int count = 0;
+  for (const auto v : mesh.vertices(f)) {
+    center += static_cast<Vector3f>(vpoints[v]);
+    count++;
+  }
+  return center / count;
+}
+
+[[nodiscard]] static bool _is_face_enlightened(const Mesh &mesh, const Face &f,
+                                               const Vector3f &lightPos) {
+  // 1. Compute the face normal
+  Vector3f n = _get_face_normal(mesh, f);
+
+  // 2. Get the face center
+  Vector3f faceCenter = _get_face_center(mesh, f);
+
+  // 3. Compute vector from face center to light
+  Vector3f toLight = (lightPos - faceCenter).normalized();
+
+  // 4. Face is enlightened if normal points toward light
+  return toLight.dot(n) > 0.f;
+}
+
+[[nodiscard]] static bool _is_edge_silhouette(const Mesh &mesh, const Edge &e,
+                                              const Vector3f &lightPos) {
+  // 1. Check if the edge is a boundary edge
+  if (mesh.is_boundary(e)) {
+    // A boundary edge is always a silhouette edge (for simplicity)
+    return true;
+  }
+
+  // 2. Get the two faces of the edge
+  Face f1 = mesh.face(e, 0);
+  Face f2 = mesh.face(e, 1);
+
+  // 3. For every face, compute the face normal
+  bool f1_enlightened = _is_face_enlightened(mesh, f1, lightPos);
+  bool f2_enlightened = _is_face_enlightened(mesh, f2, lightPos);
+  return f1_enlightened != f2_enlightened;
+}
+
 Mesh *Mesh::computeShadowVolume(const Vector3f &lightPos, bool interpolated) {
   (void)interpolated;
-  return nullptr;
+
+  Mesh *sv = new Mesh();
+  sv->add_vertex_property<Vector4f>("v:position");
+
+  std::unordered_map<int, Vector4f> extruded_positions;
+  extruded_positions.reserve(n_vertices());
+  std::vector<int> silhouette_edges;
+  silhouette_edges.reserve(n_edges());
+
+  // First pass: compute extruded positions for all vertices on silhouette edges
+  for (const auto e : edges()) {
+    if (_is_edge_silhouette(*this, e, lightPos)) {
+      silhouette_edges.push_back(e.idx());
+
+      Vertex v1 = vertex(e, 0);
+      Vertex v2 = vertex(e, 1);
+
+      Vector4f p1 = get_vertex_property<Vector4f>("v:position")[v1];
+      Vector4f p2 = get_vertex_property<Vector4f>("v:position")[v2];
+
+      // Compute extruded position for v1 if not already done
+      if (extruded_positions.find(v1.idx()) == extruded_positions.end()) {
+        Vector3f dir1 = (p1.head<3>() - lightPos).normalized();
+        Vector4f p1_extruded = Vector4f::Zero();
+        p1_extruded.head<3>() = dir1;
+        extruded_positions[v1.idx()] = p1_extruded;
+      }
+
+      // Compute extruded position for v2 if not already done
+      if (extruded_positions.find(v2.idx()) == extruded_positions.end()) {
+        Vector3f dir2 = (p2.head<3>() - lightPos).normalized();
+        Vector4f p2_extruded = Vector4f::Zero();
+        p2_extruded.head<3>() = dir2;
+        extruded_positions[v2.idx()] = p2_extruded;
+      }
+    }
+  }
+
+  // Second pass: create quads for all silhouette edges
+  for (int edge_idx : silhouette_edges) {
+    Edge e(edge_idx);
+    Vertex v1 = vertex(e, 0);
+    Vertex v2 = vertex(e, 1);
+
+    // Get original positions
+    Vector4f p1 = get_vertex_property<Vector4f>("v:position")[v1];
+    Vector4f p2 = get_vertex_property<Vector4f>("v:position")[v2];
+
+    // Get extruded positions (now consistent across all edges)
+    Vector4f p1_extruded = extruded_positions[v1.idx()];
+    Vector4f p2_extruded = extruded_positions[v2.idx()];
+
+    // Create quad with proper orientation based on which face is front-facing
+    if (_is_face_enlightened(*this, face(e, 0), lightPos)) {
+      sv->addQuad(p1, p2, p1_extruded, p2_extruded);
+    } else {
+      sv->addQuad(p2, p1, p2_extruded, p1_extruded);
+    }
+  }
+
+  return sv;
 }

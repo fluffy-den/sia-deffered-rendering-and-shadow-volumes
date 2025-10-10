@@ -3,8 +3,8 @@
 in vec3 normalV;
 in vec4 colorV;
 
-out layout(location = 0) vec4 colorG;
-out layout(location = 1) vec4 normalG;
+layout(location = 0) out vec4 colorG;
+layout(location = 1) out vec4 normalG;
 
 void main() {
     colorG = colorV;

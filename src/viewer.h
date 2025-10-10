@@ -48,8 +48,10 @@ private:
   // geometrical representation of a pointlight
   std::vector<Mesh *> _pointLights;
   std::vector<Eigen::Vector3f> _lightColors;
-  float _lightAngle = M_PI/100.f, _lastTime;
+  float _lightAngle = M_PI / 100.f, _lastTime;
   bool _animate{true};
+  bool _dispShadowVolume{false};
+  bool _dispShadowWireframe{false};
 
   enum ShadingMode { FORWARD, DEFERRED } _shadingMode{FORWARD};
 

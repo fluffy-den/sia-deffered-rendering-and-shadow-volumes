@@ -3,8 +3,8 @@
 #include "common.h"
 #include "opengl.h"
 
-#include <pmp/surface_mesh.h>
 #include <Eigen/Core>
+#include <pmp/surface_mesh.h>
 #include <string>
 #include <vector>
 
@@ -28,21 +28,24 @@ public:
   void createGrid(int m, int n);
 
   /// Creates a mesh representing a UV sphere
-  void createSphere(float radius=1.f, int nU=10, int nV=10);
+  void createSphere(float radius = 1.f, int nU = 10, int nV = 10);
 
   void init();
 
   /// Draws the mesh using OpenGL
   void draw(Shader &shader);
 
-  /// Add a 
-  void addQuad(const Vector4f &p0, const Vector4f &p1,
-               const Vector4f &p2, const Vector4f &p3);
+  /// Add a
+  void addQuad(const Vector4f &p0, const Vector4f &p1, const Vector4f &p2,
+               const Vector4f &p3);
 
-  Mesh* computeShadowVolume(const Vector3f &lightPos, bool interpolated = false);
+  Mesh *computeShadowVolume(const Vector3f &lightPos,
+                            bool interpolated = false);
 
-  const Eigen::Affine3f& transformationMatrix() const { return _transformation; }
-  Eigen::Affine3f& transformationMatrix() { return _transformation; }
+  const Eigen::Affine3f &transformationMatrix() const {
+    return _transformation;
+  }
+  Eigen::Affine3f &transformationMatrix() { return _transformation; }
 
   /// returns face indices as a 3xN matrix of integers
   Eigen::Map<Eigen::Matrix<int, 3, Eigen::Dynamic>> faceIndices() {
